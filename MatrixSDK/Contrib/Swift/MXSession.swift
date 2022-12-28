@@ -210,7 +210,19 @@ public extension MXSession {
     }
     
     
-    
+    /**
+     Leave a room.
+     
+     - parameters:
+        - roomId: the id of the room to leave.
+        - completion: A block object called when the operation completes.
+        - response: Indicates whether the operation was successful.
+     
+     - returns: a `MXHTTPOperation` instance.
+     */
+    @nonobjc @discardableResult func forgetRoom(_ roomId: String, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
+        return __forgetRoom(roomId, success: currySuccess(completion), failure: curryFailure(completion))
+    }
     
     
     

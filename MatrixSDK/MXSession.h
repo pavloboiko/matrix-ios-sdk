@@ -827,6 +827,21 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
                       failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
 
 /**
+ Forget a room.
+ 
+ The room will be removed from the rooms list.
+ 
+ @param roomId the id of the room to join.
+ @param success A block object called when the operation is complete.
+ @param failure A block object called when the operation fails.
+
+ @return a MXHTTPOperation instance.
+ */
+- (MXHTTPOperation*)forgetRoom:(NSString*)roomId
+                      success:(void (^)(void))success
+                      failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
+
+/**
  Determine if E2E can be enabled in a new room with a list users.
  
  E2E will be adviced if all users have at least one device that supports

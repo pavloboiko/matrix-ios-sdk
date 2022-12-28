@@ -1092,6 +1092,19 @@ typedef MXHTTPOperation* (^MXRestClientIdentityServerAccessTokenHandler)(void (^
                       failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
 
 /**
+ Forget a room.
+
+ @param roomId the id of the room to leave.
+ @param success A block object called when the operation succeeds.
+ @param failure A block object called when the operation fails.
+
+ @return a MXHTTPOperation instance.
+ */
+- (MXHTTPOperation*)forgetRoom:(NSString*)roomId
+                      success:(void (^)(void))success
+                      failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
+
+/**
  Invite a user to a room.
 
  @param userId the user id.

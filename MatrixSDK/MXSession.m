@@ -1972,6 +1972,40 @@ typedef void (^MXOnResumeDone)(void);
     } failure:failure];
 }
 
+- (MXHTTPOperation*)forgetRoom:(NSString*)roomId
+                      success:(void (^)(void))success
+                      failure:(void (^)(NSError *error))failure
+{
+    return [matrixRestClient forgetRoom:roomId success:^{
+
+        // Check the room has been removed before calling the success callback
+        // This is automatically done when the homeserver sends the MXMembershipLeave event.
+        if ([self roomWithRoomId:roomId])
+        {
+            // The room is stil here, wait for the MXMembershipLeave event
+            __block __weak id observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionDidLeaveRoomNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+
+                if ([roomId isEqualToString:note.userInfo[kMXSessionNotificationRoomIdKey]])
+                {
+                    [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                    if (success)
+                    {
+                        success();
+                    }
+                }
+            }];
+        }
+        else
+        {
+            if (success)
+            {
+                success();
+            }
+        }
+
+    } failure:failure];
+}
+
 - (MXHTTPOperation*)canEnableE2EByDefaultInNewRoomWithUsers:(NSArray<NSString*>*)userIds
                                                     success:(void (^)(BOOL canEnableE2E))success
                                                     failure:(void (^)(NSError *error))failure

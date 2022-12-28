@@ -2003,6 +2003,16 @@ MXAuthAction;
                              success:success failure:failure];
 }
 
+- (MXHTTPOperation*)forgetRoom:(NSString*)roomId
+                      success:(void (^)(void))success
+                      failure:(void (^)(NSError *error))failure
+{
+    return [self doMembershipRequest:roomId
+                          membership:@"forget"
+                          parameters:nil
+                             success:success failure:failure];
+}
+
 - (MXHTTPOperation*)inviteUser:(NSString*)userId
                         toRoom:(NSString*)roomId
                        success:(void (^)(void))success
