@@ -46,8 +46,6 @@
 #import "MXAggregations_Private.h"
 
 #pragma mark - Constants definitions
-
-const NSString *MatrixSDKVersion = @"0.16.4";
 NSString *const kMXSessionStateDidChangeNotification = @"kMXSessionStateDidChangeNotification";
 NSString *const kMXSessionNewRoomNotification = @"kMXSessionNewRoomNotification";
 NSString *const kMXSessionWillLeaveRoomNotification = @"kMXSessionWillLeaveRoomNotification";
@@ -694,10 +692,16 @@ typedef void (^MXOnResumeDone)(void);
 
 - (void)backgroundSync:(unsigned int)timeout success:(MXOnBackgroundSyncDone)backgroundSyncDone failure:(MXOnBackgroundSyncFail)backgroundSyncfails
 {
+    //  background sync considering session state
+    [self backgroundSync:timeout ignoreSessionState:NO success:backgroundSyncDone failure:backgroundSyncfails];
+}
+
+- (void)backgroundSync:(unsigned int)timeout ignoreSessionState:(BOOL)ignoreSessionState success:(MXOnBackgroundSyncDone)backgroundSyncDone failure:(MXOnBackgroundSyncFail)backgroundSyncfails
+{
     // Check whether no request is already in progress
     if (!eventStreamRequest)
     {
-        if (MXSessionStatePaused != _state)
+        if (!ignoreSessionState && MXSessionStatePaused != _state)
         {
             NSLog(@"[MXSession] background Sync cannot be done in the current state %tu", _state);
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -949,7 +953,7 @@ typedef void (^MXOnResumeDone)(void);
     _catchingUp = (0 == serverTimeout);
 
     NSString * streamToken = _store.eventStreamToken;
-    NSLog(@"[MXSession] Do a server sync%@: %@", _catchingUp ? @" (catching up)" : @"", streamToken);
+    NSLog(@"[MXSession] Do a server sync%@ from token: %@", _catchingUp ? @" (catching up)" : @"", streamToken);
 
     MXWeakify(self);
     eventStreamRequest = [matrixRestClient syncFromToken:streamToken serverTimeout:serverTimeout clientTimeout:clientTimeout setPresence:setPresence filter:self.syncFilterId success:^(MXSyncResponse *syncResponse) {
@@ -1148,6 +1152,7 @@ typedef void (^MXOnResumeDone)(void);
 
 
             // Update live event stream token
+            NSLog(@"[MXSession] Next sync token: %@", streamToken);
             self.store.eventStreamToken = syncResponse.nextBatch;
 
             // Commit store changes done in [room handleMessages]
@@ -3444,7 +3449,19 @@ typedef void (^MXOnResumeDone)(void);
                            success:(void (^)(void))success
                            failure:(void (^)(NSError *error))failure
 {
-    return [matrixRestClient setAccountData:data forType:type success:success failure:failure];
+    MXWeakify(self);
+    return [matrixRestClient setAccountData:data forType:type success:^{
+        MXStrongifyAndReturnIfNil(self);
+        
+        // Update data in place
+        [self->_accountData updateDataWithType:type data:data];
+        
+        if (success)
+        {
+            success();
+        }
+        
+    } failure:failure];
 }
 
 - (MXHTTPOperation *)setAccountDataIdentityServer:(NSString *)identityServer
@@ -3538,7 +3555,21 @@ typedef void (^MXOnResumeDone)(void);
     NSLog(@"[MXSession] refreshHomeserverWellknown");
     if (!autoDiscovery)
     {
-        autoDiscovery = [[MXAutoDiscovery alloc] initWithUrl:matrixRestClient.homeserver];
+        NSString *homeServer;
+        
+        // Retrieve the domain from the user id as it can be different from the `MXRestClient.homeserver` that uses the client-server API endpoint domain.
+        NSString *userDomain = [MXTools serverNameInMatrixIdentifier:self.myUserId];
+        
+        if (userDomain)
+        {
+            homeServer =  [NSString stringWithFormat:@"https://%@", userDomain];
+        }
+        else
+        {
+            homeServer = matrixRestClient.homeserver;
+        }
+        
+        autoDiscovery = [[MXAutoDiscovery alloc] initWithUrl:homeServer];
     }
 
     MXWeakify(self);

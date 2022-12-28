@@ -187,9 +187,10 @@ NSUInteger const kMXKeyBackupSendKeysMaxCount = 100;
     NSLog(@"[MXKeyBackup] resetKeyBackupData");
     
     [self resetBackupAllGroupSessionsObjects];
-
+    
     self->crypto.store.backupVersion = nil;
-    _backupKey = nil;
+    [self->crypto.store deleteSecretWithSecretId:MXSecretId.keyBackup];
+   _backupKey = nil;
 
     // Reset backup markers
     [self->crypto.store resetBackupMarkers];
@@ -1288,7 +1289,7 @@ NSUInteger const kMXKeyBackupSendKeysMaxCount = 100;
 {
     BOOL isSecretValid = NO;
     
-    NSData *privateKey = [MXBase64Tools dataFromUnpaddedBase64:secret];
+    NSData *privateKey = [MXBase64Tools dataFromBase64:secret];
     NSString *pKDecryptionPublicKey = [self pkDecrytionPublicKeyFromPrivateKey:privateKey];
     if ([self checkPkDecryptionPublicKey:pKDecryptionPublicKey forKeyBackupVersion:keyBackupVersion])
     {
@@ -1431,7 +1432,7 @@ NSUInteger const kMXKeyBackupSendKeysMaxCount = 100;
         return nil;
     }
     
-    return [MXBase64Tools dataFromUnpaddedBase64:privateKeyBase64];
+    return [MXBase64Tools dataFromBase64:privateKeyBase64];
 }
 
 - (nullable OLMPkDecryption*)pkDecryptionFromCryptoStore

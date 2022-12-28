@@ -28,7 +28,9 @@
 #import "MXIncomingRoomKeyRequest.h"
 #import "MXIncomingRoomKeyRequestCancellation.h"
 
+#import "MXSecretStorage.h"
 #import "MXSecretShareManager.h"
+#import "MXRecoveryService.h"
 
 #import "MXKeyBackup.h"
 #import "MXKeyVerificationManager.h"
@@ -99,6 +101,16 @@ extern NSString *const MXDeviceListDidUpdateUsersDevicesNotification;
 @property (nonatomic, readonly) MXKeyVerificationManager *keyVerificationManager;
 
 /**
+ Service to manage backup of private keys on the homeserver.
+ */
+@property (nonatomic, readonly) MXRecoveryService *recoveryService;
+
+/**
+ The secret storage on homeserver manager.
+ */
+@property (nonatomic, readonly) MXSecretStorage *secretStorage;
+
+/**
  The secret share manager.
  */
 @property (nonatomic, readonly) MXSecretShareManager *secretShareManager;
@@ -155,6 +167,15 @@ extern NSString *const MXDeviceListDidUpdateUsersDevicesNotification;
 - (MXHTTPOperation*)encryptEventContent:(NSDictionary*)eventContent withType:(MXEventTypeString)eventType inRoom:(MXRoom*)room
                                 success:(void (^)(NSDictionary *encryptedContent, NSString *encryptedEventType))success
                                 failure:(void (^)(NSError *error))failure;
+
+/**
+ Check if we have keys to decrypt an event.
+ 
+ @param event the event to decrypt.
+
+ @return YES if keys are present.
+ */
+- (BOOL)hasKeysToDecryptEvent:(MXEvent*)event;
 
 /**
  Decrypt a received event.

@@ -675,11 +675,11 @@
                 }];
 
             } failure:^(NSError *error) {
-                NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
+                XCTFail(@"Cannot set up intial test conditions - error: %@", error);
             }];
 
         } failure:^(NSError *error) {
-            NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
+            XCTFail(@"Cannot set up intial test conditions - error: %@", error);
         }];
 
     }];
@@ -892,7 +892,7 @@
 
             // Relog alice to simulate a new device
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-            [matrixSDKTestsData relogUserSession:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+            [matrixSDKTestsData relogUserSession:self session:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
                 [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
                 aliceSessionToClose = aliceSession2;
@@ -927,7 +927,7 @@
 
         // Relog alice to simulate a new device
         [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-        [matrixSDKTestsData relogUserSession:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+        [matrixSDKTestsData relogUserSession:self session:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
             aliceSessionToClose = aliceSession2;
@@ -974,7 +974,7 @@
 
                 // Relog bob to simulate a new device
                 [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-                [matrixSDKTestsData relogUserSession:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *bobSession2) {
+                [matrixSDKTestsData relogUserSession:self session:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *bobSession2) {
                     [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
                     aliceSessionToClose = aliceSession;
@@ -1021,12 +1021,12 @@
 
         // Relog alice to simulate a new device
         [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-        [matrixSDKTestsData relogUserSession:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+        [matrixSDKTestsData relogUserSession:self session:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
             // Relog bob to simulate a new device
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-            [matrixSDKTestsData relogUserSession:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *bobSession2) {
+            [matrixSDKTestsData relogUserSession:self session:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *bobSession2) {
                 [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
                 aliceSessionToClose = aliceSession2;
@@ -1593,7 +1593,7 @@
             }];
             
             [bobSession joinRoom:roomId viaServers:nil success:nil failure:^(NSError *error) {
-                NSAssert(NO, @"Cannot join a room - error: %@", error);
+                XCTFail(@"Cannot join a room - error: %@", error);
                 [expectation fulfill];
             }];
             
@@ -1631,7 +1631,7 @@
                         [expectation fulfill];
                     }];
                 } failure:^(NSError *error) {
-                    NSAssert(NO, @"Cannot join a room - error: %@", error);
+                    XCTFail(@"Cannot join a room - error: %@", error);
                     [expectation fulfill];
                 }];
                 
@@ -1658,8 +1658,130 @@
     }];
 }
 
+// - Have Alice and Bob in an e2e room
+// - Bob pauses his session
+// - Alice sends a message
+// - Bob can get the message using /event API
+// -> But he does not have keys decrypt it
+// - Bob resumes his session
+// -> He has keys now
+- (void)testHasKeysToDecryptEvent
+{
+    // - Have Alice and Bob in an e2e room
+    [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoom:self cryptedBob:YES warnOnUnknowDevices:NO readyToTest:^(MXSession *aliceSession, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
+        
+        NSString *messageFromAlice = @"Hello I'm Alice!";
+        
+        MXRoom *roomFromAlicePOV = [aliceSession roomWithRoomId:roomId];
+        
+        // - Bob pauses his session
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [bobSession pause];
+            
+            // - Alice sends a message
+            [roomFromAlicePOV sendTextMessage:messageFromAlice success:^(NSString *eventId) {
+                
+                // - Bob can get the message using /event API
+                [bobSession eventWithEventId:eventId inRoom:roomId success:^(MXEvent *event) {
+                    
+                    // -> But he does not have keys decrypt it
+                    BOOL hasKeys = [bobSession.crypto hasKeysToDecryptEvent:event];
+                    XCTAssertFalse(hasKeys);
+                    
+                    // - Bob resumes his session
+                    [bobSession resume:^{
+                        
+                        // -> He has keys now
+                        BOOL hasKeys = [bobSession.crypto hasKeysToDecryptEvent:event];
+                        XCTAssertTrue(hasKeys);
+                        
+                        [expectation fulfill];
+                    }];
+
+                } failure:^(NSError *error) {
+                    XCTFail(@"The operation should not fail - NSError: %@", error);
+                    [expectation fulfill];
+                }];
+                
+            } failure:^(NSError *error) {
+                XCTFail(@"Cannot set up intial test conditions - error: %@", error);
+                [expectation fulfill];
+            }];
+        });
+    }];
+}
+
+
 #pragma mark - Edge cases
 
+// Trying to set up several olm sessions in parallel should result in the creation of a single olm session
+//
+// - Have Alice and Bob
+// - Make Alice know Bob's device
+// - Move to the crypto thread (this is an internal technical test)
+// - Create a first olm session
+// -> It must succeed
+// - Create a second olm session in parallel
+// -> It must not create another HTTP request
+// -> It must succeed using the same olm session
+
+- (void)testEnsureSingleOlmSession
+{
+    // - Have Alice and Bob
+    [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoom:self cryptedBob:YES warnOnUnknowDevices:NO readyToTest:^(MXSession *aliceSession, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
+        
+        // - Make Alice know Bob's device
+        [aliceSession.crypto downloadKeys:@[bobSession.myUserId] forceDownload:NO success:^(MXUsersDevicesMap<MXDeviceInfo *> *usersDevicesInfoMap, NSDictionary<NSString *,MXCrossSigningInfo *> *crossSigningKeysMap) {
+        
+            // - Move to the crypto thread (this is an internal technical test)
+            dispatch_async(aliceSession.crypto.cryptoQueue, ^{
+                
+                MXHTTPOperation *operation;
+                __block NSString *olmSessionId;
+                
+                
+                // - Create a first olm session
+                operation = [aliceSession.crypto ensureOlmSessionsForUsers:@[bobSession.myUserId] success:^(MXUsersDevicesMap<MXOlmSessionResult *> *results) {
+ 
+                    // -> It must succeed
+                    olmSessionId = [results objectForDevice:bobSession.myDeviceId forUser:bobSession.myUserId].sessionId;
+                    XCTAssertNotNil(olmSessionId);
+                    
+                } failure:^(NSError *error) {
+                    XCTFail(@"The operation should not fail - NSError: %@", error);
+                    [expectation fulfill];
+                }];
+                
+                XCTAssertNotNil(operation);
+                
+                
+                // - Create a second olm session in parallel
+                operation = [aliceSession.crypto ensureOlmSessionsForUsers:@[bobSession.myUserId] success:^(MXUsersDevicesMap<MXOlmSessionResult *> *results) {
+                    
+                    // -> It must succeed using the same olm session
+                    NSString *olmSessionId2 = [results objectForDevice:bobSession.myDeviceId forUser:bobSession.myUserId].sessionId;
+                    XCTAssertNotNil(olmSessionId2);
+                    XCTAssertEqualObjects(olmSessionId, olmSessionId2);
+                    
+                    [expectation fulfill];
+                    
+                } failure:^(NSError *error) {
+                    XCTFail(@"The operation should not fail - NSError: %@", error);
+                    [expectation fulfill];
+                }];
+                
+                // -> It must not create another HTTP request
+                XCTAssertNil(operation);
+                
+            });
+            
+        } failure:^(NSError *error) {
+            XCTFail(@"Cannot set up intial test conditions - error: %@", error);
+            [expectation fulfill];
+        }];
+    }];
+}
+        
 - (void)testReplayAttack
 {
     [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoom:self cryptedBob:YES warnOnUnknowDevices:NO readyToTest:^(MXSession *aliceSession, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
@@ -2041,7 +2163,7 @@
 
                                     // Relog bob to simulate a new device
                                     [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-                                    [matrixSDKTestsData relogUserSession:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *bobSession2) {
+                                    [matrixSDKTestsData relogUserSession:self session:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *bobSession2) {
 
                                         [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
@@ -2124,7 +2246,7 @@
 
             // - Alice adds a new device
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-            [matrixSDKTestsData relogUserSession:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+            [matrixSDKTestsData relogUserSession:self session:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
                 [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
                 aliceSessionToClose = aliceSession2;
@@ -2223,7 +2345,7 @@
 
                         // Relog bob to simulate a new device
                         [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-                        [matrixSDKTestsData relogUserSession:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *newBobSession) {
+                        [matrixSDKTestsData relogUserSession:self session:bobSession withPassword:MXTESTS_BOB_PWD onComplete:^(MXSession *newBobSession) {
 
                             aliceSessionToClose = aliceSession;
                             bobSessionToClose = newBobSession;
@@ -2655,7 +2777,7 @@
         // 3 - Recreate a second MXSession, aliceSession2, for Alice with a new device
         // Relog alice to simulate a new device
         [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-        [matrixSDKTestsData relogUserSessionWithNewDevice:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+        [matrixSDKTestsData relogUserSessionWithNewDevice:self session:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
             aliceSessionToClose = aliceSession2;
@@ -2847,16 +2969,18 @@
     [matrixSDKTestsE2EData doE2ETestWithAliceInARoom:self readyToTest:^(MXSession *aliceSession, NSString *roomId, XCTestExpectation *expectation) {
         
         // - Alice logs in on a new device
-        [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *newAliceSession) {
+        [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *newAliceSession) {
         }];
         
         // -> The first device must get notified by the new sign-in
         observer = [[NSNotificationCenter defaultCenter] addObserverForName:MXDeviceListDidUpdateUsersDevicesNotification object:aliceSession.crypto queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
             
             NSDictionary *userInfo = notification.userInfo;
-            NSArray<MXDeviceInfo*> *myUserDevices = userInfo[aliceSession.myUser.userId];
+            NSArray<MXDeviceInfo*> *updatedDevices = userInfo[aliceSession.myUser.userId];
             
-            XCTAssertEqual(myUserDevices.count, 2);
+            XCTAssertEqual(updatedDevices.count, 1);
+            XCTAssertNotNil(updatedDevices.firstObject.deviceId);
+            XCTAssertNotEqualObjects(updatedDevices.firstObject.deviceId, aliceSession.myDeviceId);
             
             [expectation fulfill];
         }];

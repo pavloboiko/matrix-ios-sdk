@@ -37,8 +37,10 @@ static MXSDKOptions *sharedOnceInstance = nil;
     {
         _disableIdenticonUseForUserAvatar = NO;
         _enableCryptoWhenStartingMXSession = NO;
+        _enableKeyBackupWhenStartingMXCrypto = YES;
         _mediaCacheAppVersion = 0;
         _applicationGroupIdentifier = nil;
+        _HTTPAdditionalHeaders = @{};
     }
     
     return self;

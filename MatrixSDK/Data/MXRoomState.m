@@ -226,6 +226,13 @@
         }
     }
     
+    //  include canonicalAlias into aliases array
+    NSString *canonicalAlias = self.canonicalAlias;
+    if (canonicalAlias)
+    {
+        [aliases addObject:canonicalAlias];
+    }
+    
     return aliases.count ? aliases : nil;
 }
 
@@ -585,7 +592,7 @@
 
     stateCopy->_members = [_members copyWithZone:zone];
 
-    stateCopy->_membersCount = _membersCount;
+    stateCopy->_membersCount = [_membersCount copyWithZone:zone];
     
     stateCopy->roomAliases = [[NSMutableDictionary allocWithZone:zone] initWithDictionary:roomAliases];
 

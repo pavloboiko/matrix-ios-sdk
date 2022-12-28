@@ -1,3 +1,364 @@
+Changes in 0.16.19 (2020-10-14)
+=================================================
+
+✨ Features
+ * 
+
+🙌 Improvements
+ * MXCrossSigning: Detect when cross-signing keys have been reset and send MXCrossSigningDidChangeCrossSigningKeysNotification.
+
+🐛 Bugfix
+ * Tests: Fix testMXDeviceListDidUpdateUsersDevicesNotification.
+ * MXCrossSigning: Trust cross-signing because we locally trust the device that created it.
+
+⚠️ API Changes
+ * 
+
+🗣 Translations
+ * 
+    
+🧱 Build
+ * 
+
+Others
+ * 
+
+Improvements:
+
+
+Changes in 0.16.18 (2020-10-13)
+=================================================
+
+✨ Features
+ * 
+
+🙌 Improvements
+ * 
+
+🐛 Bugfix
+ * Fix nonstring msgtyped room messages, by removing msgtype from the wire and prev contents. 
+
+⚠️ API Changes
+ * 
+
+🗣 Translations
+ * 
+    
+🧱 Build
+ * 
+
+Others
+ * 
+
+Improvements:
+
+
+Changes in 0.16.17 (2020-10-09)
+=================================================
+
+✨ Features
+ * 
+
+🙌 Improvements
+ * MXCrypto: Add hasKeysToDecryptEvent method.
+
+🐛 Bugfix
+ * MXCrypto: Reset OTKs when some IDs are already used (https://github.com/vector-im/element-ios/issues/3721).
+ * MXCrypto: Send MXCrossSigningMyUserDidSignInOnNewDeviceNotification and MXDeviceListDidUpdateUsersDevicesNotification on the main thread.
+ * MXCrossSigning: Do not send MXCrossSigningMyUserDidSignInOnNewDeviceNotification again if the device has been verified from another thread.
+ 
+⚠️ API Changes
+ * 
+
+🗣 Translations
+ * 
+    
+🧱 Build
+ * 
+
+Others
+ * 
+
+Improvements:
+
+
+Changes in 0.16.16 (2020-09-30)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * 
+
+Bugfix:
+ * MXBase64Tools: Make sure the SDK decode padded and unpadded base64 strings like other platforms (vector-im/riot-ios/issues/3667).
+ * SSSS: Use unpadded base64 for secrets data (vector-im/riot-ios/issues/3669).
+ * MXSession: Fix `refreshHomeserverWellknown` method not reading Well-Known from the homeserver domain (vector-im/element-ios/issues/3653).
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.15 (2020-09-03)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * MXPushData: Implement JSONDictionary (vector-im/riot-ios/issues/3577).
+ * MXFileStore: Make loadMetaData more robust.
+
+Bugfix:
+ * 
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.14 (2020-08-28)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * 
+
+Bugfix:
+ * MXCredentials: Try to guess homeserver in credentials when not provided in wellknown (vector-im/element-ios/issues/3448). 
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.13 (2020-08-25)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * Introduce handleCallEvent on MXCallManager. 
+
+Bugfix:
+ * Some room members count are wrong after clearing the cache
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.12 (2020-08-19)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * Introduce HTTPAdditionalHeaders in MXSDKOptions.
+
+Bugfix:
+ * 
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.11 (2020-08-13)
+=================================================
+
+Features:
+ * Introduce MXPushGatewayRestClient (part of vector-im/element-ios#3452). 
+
+Improvements:
+ * 
+
+Bugfix:
+ * 
+
+API Change:
+ * Drop SwiftMatrixSDK (vector-im/element-ios#3518).
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.10 (2020-08-07)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * 
+
+Bugfix:
+ * 
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * Fix "fastlane ios test" and generate html report.
+ * Make tests crash instantly if no local synapse is running.
+ * Do not use anymore NSAssert in tests.
+
+Changes in 0.16.9 (2020-08-05)
+=================================================
+
+Features:
+ * 
+
+Improvements:
+ * 
+
+Bugfix:
+ * 
+
+API Change:
+ * 
+
+Translations:
+ * 
+
+Others:
+ * 
+
+Build:
+ * 
+
+Test:
+ * 
+
+Changes in 0.16.8 (2020-07-28)
+================================================
+
+Improvements:
+ * MXSession: Log next sync token.
+ 
+Bug fix:
+ * MXRoom: Reply: Use formatted body only if the message content format is known.
+ * MXRoom: Reply: Avoid nested mx-reply tags.
+
+Changes in Matrix iOS SDK in 0.16.7 (2020-07-13)
+================================================
+
+Bug fix:
+ * MXCreateRoomReponse: Remove undocumented roomAlias property (vector-im/riot-ios/issues/3300).
+ * MXPushRuleSenderNotificationPermissionConditionChecker & MXPushRuleRoomMemberCountConditionChecker: Remove redundant room check (vector-im/riot-ios/issues/3354).
+ * MXSDKOptions: Introduce enableKeyBackupWhenStartingMXCrypto option (vector-im/riot-ios/issues/3371).
+
+Changes in Matrix iOS SDK in 0.16.6 (2020-06-30)
+================================================
+
+Improvements:
+ * MXCrypto: Only create one olm session at a time per device (vector-im/riot-ios/issues/2331).
+ * MXCrossSigning: Add the bootstrapWithAuthParams method.
+ * MXRecoveryService: Create this service to manage keys we want to store in SSSS.
+ * MXRecoveryService: Add deleteRecovery.
+ * MXRecoveryService: Add options to create and delete key backup automatically (vector-im/riot-ios/issues/3361).
+ * MXSecretStorage: Add options to remove secrets and SSSS. 
+ * MXWellKnown: Add JSONDictionary implementation to return original and extended data.
+ * MXCrossSigning: Gossip the master key (vector-im/riot-ios/issues/3346).
+ * MXRestClient: Add authSessionForRequestWithMethod to get an auth session for any requests.
+
+Bug fix:
+ * MXSecretShareManager: Fix crash in cancelRequestWithRequestId (vector-im/riot-ios/issues/3272).
+ * MXIdentityService: Fix crash in handleHTTPClientError (vector-im/riot-ios/issues/3273).
+ * MXSession: Add ignoreSessionState to backgroundSync method.
+ * MXDeviceList: Fix crash in refreshOutdatedDeviceLists (vector-im/riot-ios/issues/3118).
+ * MXDeviceListOperationsPool: Fix current device verification status put in MXDeviceUnknown instead of MXDeviceVerified (vector-im/riot-ios/issues/3343).
+
+API break:
+ * MXCrossSigning: Removed MXCrossSigningStateCanCrossSignAsynchronously.
+
+Changes in Matrix iOS SDK in 0.16.5 (2020-05-18)
+================================================
+
+Improvements:
+ * MXSession: Update account data as soon as the endpoint returns.
+ * MXSecretStorage: Add this class to support SSSS ([MSC1946(]https://github.com/matrix-org/matrix-doc/pull/1946).
+ * SAS verification: Support new key agreement.
+ * MatrixSDK/JingleCallStack: Update Jitsi Meet dependency to ~> 2.8.1 and upgrade the minimal iOS version to 11.0 because the Jitsi Meet framework requires it.
+ * MXCallAudioSessionConfigurator: Add `configureAudioSessionAfterCallEnds` method.
+ * MXCallKitAdapter: Move incoming audio configuration in `performAnswerCallAction` as recommended. Handle audio session configuration after call ends.
+ 
+ Bug fix:
+ * MXJingleCallAudioSessionConfigurator: Handle RTCAudioSession manually, enable audio when needed. Fix outgoing audio issue after consecutive incoming calls.
+
 Changes in Matrix iOS SDK in 0.16.4 (2020-05-07)
 ================================================
 
