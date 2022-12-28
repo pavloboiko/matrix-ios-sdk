@@ -26,6 +26,7 @@
     {
         MXJSONModelSetString(encryptedContentFile.v, JSONDictionary[@"v"]);
         MXJSONModelSetString(encryptedContentFile.url, JSONDictionary[@"url"]);
+        MXJSONModelSetString(encryptedContentFile.mimetype, JSONDictionary[@"mimetype"]);
         MXJSONModelSetMXJSONModel(encryptedContentFile.key, MXEncryptedContentKey, JSONDictionary[@"key"]);
         MXJSONModelSetString(encryptedContentFile.iv, JSONDictionary[@"iv"]);
         MXJSONModelSetDictionary(encryptedContentFile.hashes, JSONDictionary[@"hashes"]);
@@ -40,6 +41,7 @@
     {
         JSONDictionary[@"v"] = _v;
         JSONDictionary[@"url"] = _url;
+        JSONDictionary[@"mimetype"] = _mimetype;
         JSONDictionary[@"key"] = _key.JSONDictionary;
         JSONDictionary[@"iv"] = _iv;
         JSONDictionary[@"hashes"] = _hashes;

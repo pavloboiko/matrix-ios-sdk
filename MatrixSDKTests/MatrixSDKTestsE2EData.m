@@ -24,17 +24,16 @@
 #import "MXDeviceListOperation.h"
 #import "MXFileStore.h"
 #import "MXNoStore.h"
-#import "MXTools.h"
-#import "MatrixSDKTestsSwiftHeader.h"
 
 @interface MatrixSDKTestsE2EData ()
-
-@property (nonatomic, weak) MatrixSDKTestsData *matrixSDKTestsData;
+{
+    MatrixSDKTestsData *matrixSDKTestsData;
+}
 
 @end
 
 @implementation MatrixSDKTestsE2EData
-@synthesize matrixSDKTestsData, messagesFromAlice, messagesFromBob;
+@synthesize messagesFromAlice, messagesFromBob;
 
 - (instancetype)initWithMatrixSDKTestsData:(MatrixSDKTestsData *)theMatrixSDKTestsData
 {
@@ -98,11 +97,11 @@
                 readyToTest(aliceSession, room.roomId, expectation);
 
             } failure:^(NSError *error) {
-                [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot enable encryption in room - error: %@", error];
+                NSAssert(NO, @"Cannot enable encryption in room - error: %@", error);
             }];
 
         } failure:^(NSError *error) {
-            [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot create a room - error: %@", error];
+            NSAssert(NO, @"Cannot create a room - error: %@", error);
         }];
         
     }];
@@ -133,8 +132,8 @@
 
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
-            aliceSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
-            bobSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            aliceSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            bobSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
 
             // Listen to Bob MXSessionNewRoomNotification event
             __block __weak id observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionNewRoomNotification object:bobSession queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
@@ -146,13 +145,13 @@
                     readyToTest(aliceSession, bobSession, room.roomId, expectation);
 
                 } failure:^(NSError *error) {
-                    [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot join a room - error: %@", error];
+                    NSAssert(NO, @"Cannot join a room - error: %@", error);
                 }];
             }];
 
             [room inviteUser:bobSession.myUser.userId success:nil failure:^(NSError *error) {
                 [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot invite Bob (%@) - error: %@", bobSession.myUser.userId, error];
+                NSAssert(NO, @"Cannot invite Bob (%@) - error: %@", bobSession.myUser.userId, error);
             }];
 
         }];
@@ -185,13 +184,13 @@
             
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
             
-            aliceSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
-            bobSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            aliceSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            bobSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
             
             [room inviteUser:bobSession.myUser.userId success:^{
                 readyToTest(aliceSession, bobSession, room.roomId, expectation);
             } failure:^(NSError *error) {
-                [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot invite Bob (%@) - error: %@", bobSession.myUser.userId, error];
+                NSAssert(NO, @"Cannot invite Bob (%@) - error: %@", bobSession.myUser.userId, error);
             }];
             
         }];
@@ -210,7 +209,7 @@
 
         __block NSUInteger messagesCount = 0;
 
-        [roomFromBobPOV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+        [roomFromBobPOV liveTimeline:^(MXEventTimeline *liveTimeline) {
             [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
                 if (++messagesCount == 5)
                 {
@@ -221,15 +220,15 @@
 
 
         // Send messages in expected order
-        [roomFromAlicePOV sendTextMessage:messagesFromAlice[0] threadId:nil success:^(NSString *eventId) {
+        [roomFromAlicePOV sendTextMessage:messagesFromAlice[0] success:^(NSString *eventId) {
 
-            [roomFromBobPOV sendTextMessage:messagesFromBob[0] threadId:nil success:^(NSString *eventId) {
+            [roomFromBobPOV sendTextMessage:messagesFromBob[0] success:^(NSString *eventId) {
 
-                [roomFromBobPOV sendTextMessage:messagesFromBob[1] threadId:nil success:^(NSString *eventId) {
+                [roomFromBobPOV sendTextMessage:messagesFromBob[1] success:^(NSString *eventId) {
 
-                    [roomFromBobPOV sendTextMessage:messagesFromBob[2] threadId:nil success:^(NSString *eventId) {
+                    [roomFromBobPOV sendTextMessage:messagesFromBob[2] success:^(NSString *eventId) {
 
-                        [roomFromAlicePOV sendTextMessage:messagesFromAlice[1] threadId:nil success:nil failure:nil];
+                        [roomFromAlicePOV sendTextMessage:messagesFromAlice[1] success:nil failure:nil];
 
                     } failure:nil];
 
@@ -238,7 +237,7 @@
             } failure:nil];
 
         } failure:^(NSError *error) {
-            [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+            NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
         }];
 
     }];
@@ -263,9 +262,9 @@
 
             [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
-            aliceSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
-            bobSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
-            samSession.legacyCrypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            aliceSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            bobSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
+            samSession.crypto.warnOnUnknowDevices = warnOnUnknowDevices;
 
             // Listen to Sam MXSessionNewRoomNotification event
             __block __weak id observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionNewRoomNotification object:samSession queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
@@ -277,36 +276,20 @@
                     readyToTest(aliceSession, bobSession, samSession, room.roomId, expectation);
 
                 } failure:^(NSError *error) {
-                    [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot join a room - error: %@", error];
+                    NSAssert(NO, @"Cannot join a room - error: %@", error);
                 }];
             }];
 
             [room inviteUser:samSession.myUser.userId success:nil failure:^(NSError *error) {
                 [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot invite Alice - error: %@", error];
+                NSAssert(NO, @"Cannot invite Alice - error: %@", error);
             }];
 
         }];
     }];
 }
 
-- (void)loginUserOnANewDevice:(XCTestCase*)testCase
-                  credentials:(MXCredentials*)credentials
-                 withPassword:(NSString*)password
-                   onComplete:(void (^)(MXSession *newSession))onComplete
-{
-    [self loginUserOnANewDevice:testCase
-                    credentials:credentials
-                   withPassword:password
-                          store:[[MXNoStore alloc] init]
-                     onComplete:onComplete];
-}
-
-- (void)loginUserOnANewDevice:(XCTestCase*)testCase
-                  credentials:(MXCredentials*)credentials
-                 withPassword:(NSString*)password
-                        store:(id<MXStore>)store
-                   onComplete:(void (^)(MXSession *newSession))onComplete
+- (void)loginUserOnANewDevice:(MXCredentials*)credentials withPassword:(NSString*)password onComplete:(void (^)(MXSession *newSession))onComplete
 {
     [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
     
@@ -316,29 +299,23 @@
     
     [mxRestClient loginWithLoginType:kMXLoginFlowTypePassword username:credentials.userId password:password success:^(MXCredentials *credentials2) {
         
-        MXRestClient *mxRestClient2 = [[MXRestClient alloc] initWithCredentials:credentials2 andOnUnrecognizedCertificateBlock:nil andPersistentTokenDataHandler:nil andUnauthenticatedHandler:nil];
+        MXRestClient *mxRestClient2 = [[MXRestClient alloc] initWithCredentials:credentials2 andOnUnrecognizedCertificateBlock:nil];
         [matrixSDKTestsData retain:mxRestClient2];
         
         MXSession *newSession = [[MXSession alloc] initWithMatrixRestClient:mxRestClient2];
         [matrixSDKTestsData retain:newSession];
         
-        MXWeakify(newSession);
-        [newSession setStore:store success:^{
-            MXStrongifyAndReturnIfNil(newSession);
-            [newSession start:^{
-                [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
-                
-                onComplete(newSession);
-                
-            } failure:^(NSError *error) {
-                [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
-            }];
+        [newSession start:^{
+            [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
+            
+            onComplete(newSession);
+            
         } failure:^(NSError *error) {
-            [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up store - error: %@", error];
+            NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
         }];
         
     } failure:^(NSError *error) {
-        [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot log %@ in again. Error: %@", credentials.userId , error];
+        NSAssert(NO, @"Cannot log %@ in again. Error: %@", credentials.userId , error);
     }];
 }
 
@@ -363,10 +340,10 @@
                                                readyToTest:^(MXSession *aliceSession1, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation)
      {
          // - Bootstrap cross-signing x2
-         [aliceSession1.crypto.crossSigning setupWithPassword:MXTESTS_ALICE_PWD success:^{
-             [bobSession.crypto.crossSigning setupWithPassword:MXTESTS_BOB_PWD success:^{
+         [aliceSession1.crypto.crossSigning bootstrapWithPassword:MXTESTS_ALICE_PWD success:^{
+             [bobSession.crypto.crossSigning bootstrapWithPassword:MXTESTS_BOB_PWD success:^{
                  
-                 [self loginUserOnANewDevice:testCase credentials:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+                 [self loginUserOnANewDevice:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
                      
                      NSString *aliceUserId = aliceSession1.matrixRestClient.credentials.userId;
                      NSString *bobUserId = bobSession.matrixRestClient.credentials.userId;
@@ -392,37 +369,37 @@
                                          });
                                          
                                      } failure:^(NSError *error) {
-                                         [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+                                         NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
                                          [expectation fulfill];
                                      }];
                                      
                                  } failure:^(NSError *error) {
-                                     [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+                                     NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
                                      [expectation fulfill];
                                  }];
                                  
                              } failure:^(NSError *error) {
-                                 [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+                                 NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
                                  [expectation fulfill];
                              }];
                          } failure:^(NSError *error) {
-                             [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+                             NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
                              [expectation fulfill];
                          }];
                          
                      } failure:^(NSError *error) {
-                         [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+                         NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
                          [expectation fulfill];
                      }];
                  }];
                  
              } failure:^(NSError *error) {
-                 [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+                 NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
                  [expectation fulfill];
              }];
              
          } failure:^(NSError *error) {
-             [matrixSDKTestsData breakTestCase:testCase reason:@"Cannot set up intial test conditions - error: %@", error];
+             NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
              [expectation fulfill];
          }];
      }];
@@ -433,11 +410,11 @@
 
 - (void)outgoingRoomKeyRequestInSession:(MXSession*)session complete:(void (^)(MXOutgoingRoomKeyRequest*))complete
 {
-    dispatch_async(session.legacyCrypto.cryptoQueue, ^{
-        MXOutgoingRoomKeyRequest *outgoingRoomKeyRequest = [session.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent];
+    dispatch_async(session.crypto.cryptoQueue, ^{
+        MXOutgoingRoomKeyRequest *outgoingRoomKeyRequest = [session.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent];
         if (!outgoingRoomKeyRequest)
         {
-            outgoingRoomKeyRequest = [session.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent];
+            outgoingRoomKeyRequest = [session.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent];
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{

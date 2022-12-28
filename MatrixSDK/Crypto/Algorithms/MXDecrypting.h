@@ -1,6 +1,5 @@
 /*
  Copyright 2016 OpenMarket Ltd
- Copyright 2020 The Matrix.org Foundation C.I.C
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -23,7 +22,7 @@
 #import "MXEventDecryptionResult.h"
 #import "MXIncomingRoomKeyRequest.h"
 
-@class MXLegacyCrypto, MXOlmInboundGroupSession, MXRoomKeyResult;
+@class MXCrypto, MXOlmInboundGroupSession;
 
 
 @protocol MXDecrypting <NSObject>
@@ -33,41 +32,29 @@
 
  @param crypto the related 'MXCrypto'.
 */
-- (instancetype)initWithCrypto:(MXLegacyCrypto*)crypto;
-
-/**
- Check if we have keys to decrypt an event.
- 
- @param event the event to decrypt.
- 
- @return YES if keys are present.
- */
-- (BOOL)hasKeysToDecryptEvent:(MXEvent*)event;
+- (instancetype)initWithCrypto:(MXCrypto*)crypto;
 
 /**
  Decrypt a message.
 
+ In case of success, the event is updated with clear data.
+ In case of failure, event.decryptionError contains the error.
+
  @param event the raw event.
  @param timeline the id of the timeline where the event is decrypted. It is used
-                 to prevent replay attack. Can be nil.
+                 to prevent replay attack.
+ @param error the result error if there is a problem decrypting the event.
 
- @return The decryption result.
+ @return The decryption result. Nil if it failed.
  */
-- (MXEventDecryptionResult *)decryptEvent:(MXEvent*)event inTimeline:(NSString*)timeline;
+- (MXEventDecryptionResult *)decryptEvent:(MXEvent*)event inTimeline:(NSString*)timeline error:(NSError** )error;
 
 /**
- Handle a key event.
- 
- @param event the key event.
+ * Handle a key event.
+ *
+ * @param event the key event.
  */
 - (void)onRoomKeyEvent:(MXEvent*)event;
-
-/**
- Handle new room key
- 
- @param key the domain object with key details and safety
- */
-- (void)onRoomKey:(MXRoomKeyResult*)key;
 
 /**
  Notification that a room key has been imported.

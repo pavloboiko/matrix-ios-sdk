@@ -54,38 +54,16 @@ public enum MXEventType: Equatable, Hashable {
     case callInvite
     case callCandidates
     case callAnswer
-    case callSelectAnswer
     case callHangup
-    case callReject
-    case callNegotiate
-    case callReplaces
-    case callRejectReplacement
-    case callAssertedIdentity
-    case callAssertedIdentityUnstable
     case reaction
     case receipt
     case roomTombStone
-    case keyVerificationRequest
-    case keyVerificationReady
     case keyVerificationStart
     case keyVerificationAccept
     case keyVerificationKey
     case keyVerificationMac
     case keyVerificationCancel
     case keyVerificationDone
-    case secretRequest
-    case secretSend
-    case secretStorageDefaultKey
-    case taggedEvents
-    case spaceChild
-    case spaceOrder
-    
-    case pollStart
-    case pollResponse
-    case pollEnd
-    
-    case beaconInfo
-    case beacon
 
     case custom(String)
     
@@ -116,38 +94,17 @@ public enum MXEventType: Equatable, Hashable {
         case .callInvite: return kMXEventTypeStringCallInvite
         case .callCandidates: return kMXEventTypeStringCallCandidates
         case .callAnswer: return kMXEventTypeStringCallAnswer
-        case .callSelectAnswer: return kMXEventTypeStringCallSelectAnswer
         case .callHangup: return kMXEventTypeStringCallHangup
-        case .callReject: return kMXEventTypeStringCallReject
-        case .callNegotiate: return kMXEventTypeStringCallNegotiate
-        case .callReplaces: return kMXEventTypeStringCallReplaces
-        case .callRejectReplacement: return kMXEventTypeStringCallRejectReplacement
-        case .callAssertedIdentity: return kMXEventTypeStringCallAssertedIdentity
-        case .callAssertedIdentityUnstable: return kMXEventTypeStringCallAssertedIdentityUnstable
         case .reaction: return kMXEventTypeStringReaction
         case .receipt: return kMXEventTypeStringReceipt
         case .roomTombStone: return kMXEventTypeStringRoomTombStone
-        case .keyVerificationRequest: return kMXEventTypeStringKeyVerificationRequest
-        case .keyVerificationReady: return kMXEventTypeStringKeyVerificationReady
         case .keyVerificationStart: return kMXEventTypeStringKeyVerificationStart
         case .keyVerificationAccept: return kMXEventTypeStringKeyVerificationAccept
         case .keyVerificationKey: return kMXEventTypeStringKeyVerificationKey
         case .keyVerificationMac: return kMXEventTypeStringKeyVerificationMac
         case .keyVerificationCancel: return kMXEventTypeStringKeyVerificationCancel
         case .keyVerificationDone: return kMXEventTypeStringKeyVerificationDone
-        case .secretRequest: return kMXEventTypeStringSecretRequest
-        case .secretSend: return kMXEventTypeStringSecretSend
-        case .secretStorageDefaultKey: return kMXEventTypeStringSecretStorageDefaultKey
-        case .taggedEvents: return kMXEventTypeStringTaggedEvents
-        case .spaceChild: return kMXEventTypeStringSpaceChild
-        case .spaceOrder: return kMXEventTypeStringSpaceOrderMSC3230
             
-        case .pollStart: return kMXEventTypeStringPollStartMSC3381
-        case .pollResponse: return kMXEventTypeStringPollResponseMSC3381
-        case .pollEnd: return kMXEventTypeStringPollEndMSC3381
-        case .beaconInfo: return kMXEventTypeStringBeaconInfoMSC3672
-        case .beacon: return kMXEventTypeStringBeaconMSC3672
-
         // Swift converts any constant with the suffix "Notification" as the type `Notification.Name`
         // The original value can be reached using the `rawValue` property.
         case .typing: return NSNotification.Name.mxEventTypeStringTyping.rawValue
@@ -155,25 +112,10 @@ public enum MXEventType: Equatable, Hashable {
         case .custom(let string): return string
         }
     }
-    
+
     public init(identifier: String) {
-        let events: [MXEventType] = [.roomName, .roomTopic, .roomAvatar, .roomMember, .roomCreate, .roomJoinRules, .roomPowerLevels, .roomAliases, .roomCanonicalAlias, .roomEncrypted, .roomEncryption, .roomGuestAccess, .roomHistoryVisibility, .roomKey, .roomForwardedKey, .roomKeyRequest, .roomMessage, .roomMessageFeedback, .roomRedaction, .roomThirdPartyInvite, .roomTag, .presence, .typing, .callInvite, .callCandidates, .callAnswer, .callSelectAnswer, .callHangup, .callReject, .callNegotiate, .callReplaces, .callRejectReplacement, .callAssertedIdentity, .callAssertedIdentityUnstable, .reaction, .receipt, .roomTombStone, .keyVerificationStart, .keyVerificationAccept, .keyVerificationKey, .keyVerificationMac, .keyVerificationCancel, .keyVerificationDone, .secretRequest, .secretSend, .secretStorageDefaultKey, .taggedEvents, .spaceChild, .spaceOrder, .pollStart, .pollResponse, .pollEnd, .beaconInfo, .beacon]
-        
-        if let type = events.first(where: { $0.identifier == identifier }) {
-            self = type
-        } else {
-            if identifier == kMXEventTypeStringPollStart {
-                self = .pollStart
-            } else if identifier == kMXEventTypeStringPollResponse {
-                self = .pollResponse
-            } else if identifier == kMXEventTypeStringPollEnd {
-                self = .pollEnd
-            } else if identifier == kMXEventTypeStringSpaceOrder {
-                self = .spaceOrder
-            } else {
-                self = .custom(identifier)
-            }
-        }
+        let events: [MXEventType] = [.roomName, .roomTopic, .roomAvatar, .roomMember, .roomCreate, .roomJoinRules, .roomPowerLevels, .roomAliases, .roomCanonicalAlias, .roomEncrypted, .roomEncryption, .roomGuestAccess, .roomHistoryVisibility, .roomKey, .roomForwardedKey, .roomKeyRequest, .roomMessage, .roomMessageFeedback, .roomRedaction, .roomThirdPartyInvite, .roomTag, .presence, .typing, .callInvite, .callCandidates, .callAnswer, .callHangup, .receipt, .roomTombStone]
+        self = events.first(where: { $0.identifier == identifier }) ?? .custom(identifier)
     }
 }
 
@@ -201,5 +143,26 @@ public enum MXMessageType: Equatable, Hashable {
     public init(identifier: String) {
         let messages: [MXMessageType] = [.text, .emote, .notice, .image, .audio, .video, .location, .file]
         self = messages.first(where: { $0.identifier == identifier }) ?? .custom(identifier)
+    }
+}
+
+
+/// Membership definitions
+public enum MXMembership: Equatable, Hashable {
+    case unknown, invite, join, leave, ban
+    
+    public var identifier: __MXMembership {
+        switch self {
+        case .unknown: return __MXMembershipUnknown
+        case .invite: return __MXMembershipInvite
+        case .join: return __MXMembershipJoin
+        case .leave: return __MXMembershipLeave
+        case .ban: return __MXMembershipBan
+        }
+    }
+    
+    public init(identifier: __MXMembership) {
+        let possibilities: [MXMembership] = [.unknown, .invite, .join, .leave, .ban]
+        self = possibilities.first(where: { $0.identifier == identifier }) ?? .unknown
     }
 }

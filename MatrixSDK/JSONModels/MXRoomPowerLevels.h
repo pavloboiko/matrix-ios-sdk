@@ -17,10 +17,6 @@
 #import "MXJSONModel.h"
 
 #import "MXEvent.h"
-/**
- MXRoomPowerLevelUndefined is the value used to indicate that a power level is not defined and should not be taken into account for JSON generation.
- */
-extern NSInteger const MXRoomPowerLevelUndefined;
 
 /**
  `MXRoomPowerLevels` represents the content of a m.room.power_levels event.
@@ -51,12 +47,6 @@ extern NSInteger const MXRoomPowerLevelUndefined;
  */
 - (NSInteger)powerLevelOfUserWithUserID:(NSString*)userId;
 
-#pragma mark - Setup
-
-/**
- Instantiate MXRoomPowerLevels with values defined in the specification (https://matrix.org/docs/spec/client_server/latest#m-room-power-levels)
- */
-- (instancetype)initWithDefaultSpecValues;
 
 #pragma mark - minimum power level for actions
 /**

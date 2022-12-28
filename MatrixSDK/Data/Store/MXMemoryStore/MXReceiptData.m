@@ -25,10 +25,6 @@
     {
         _eventId = [aDecoder decodeObjectForKey:@"eventId"];
         _userId = [aDecoder decodeObjectForKey:@"userId"];
-        if ([aDecoder containsValueForKey:@"threadId"])
-        {
-            _threadId = [aDecoder decodeObjectForKey:@"threadId"];
-        }
         _ts = (uint64_t)[aDecoder decodeInt64ForKey:@"ts"];
     }
     return self;
@@ -39,10 +35,6 @@
     // All properties are mandatory except eventStreamToken
     [aCoder encodeObject:_eventId forKey:@"eventId"];
     [aCoder encodeObject:_userId forKey:@"userId"];
-    if (_threadId)
-    {
-        [aCoder encodeObject:_threadId forKey:@"threadId"];
-    }
     [aCoder encodeInt64:(int64_t)_ts forKey:@"ts"];
     
     // TODO need some new fields
@@ -55,14 +47,13 @@
     metaData->_ts = _ts;
     metaData->_eventId = [_eventId copyWithZone:zone];
     metaData->_userId = [_userId copyWithZone:zone];
-    metaData->_threadId = [_threadId copyWithZone:zone];
 
     return metaData;
 }
 
 - (NSString *)description
 {
-    return [NSString stringWithFormat:@"<MXReceiptData: %p> userId: %@ - eventId: %@ - threadId: %@ - ts: %@", self, _userId, _eventId, _threadId, @(_ts)];
+    return [NSString stringWithFormat:@"<MXReceiptData: %p> userId: %@ - eventId: %@ - ts: %@", self, _userId, _eventId, @(_ts)];
 }
 
 @end

@@ -27,25 +27,16 @@
 NSString * const MXKeyVerificationTransactionDidChangeNotification = @"MXKeyVerificationTransactionDidChangeNotification";
 
 
-@implementation MXLegacyKeyVerificationTransaction
+@implementation MXKeyVerificationTransaction
 
-@synthesize creationDate = _creationDate;
-@synthesize dmEventId = _dmEventId;
-@synthesize dmRoomId = _dmRoomId;
-@synthesize error = _error;
-@synthesize isIncoming = _isIncoming;
-@synthesize otherDevice = _otherDevice;
-@synthesize reasonCancelCode = _reasonCancelCode;
-@synthesize transport = _transport;
-
-- (instancetype)initWithOtherDevice:(MXDeviceInfo*)otherDevice andManager:(MXLegacyKeyVerificationManager*)manager;
+- (instancetype)initWithOtherDevice:(MXDeviceInfo*)otherDevice andManager:(MXKeyVerificationManager*)manager;
 {
     self = [self init];
     if (self)
     {
         _manager = manager;
         _otherDevice = otherDevice;
-        _transactionId = [MXLegacyKeyVerificationTransaction createUniqueIdWithOtherUser:self.otherUserId otherDevice:self.otherDeviceId myUser:manager.crypto.mxSession.matrixRestClient.credentials];
+        _transactionId = [MXKeyVerificationTransaction createUniqueIdWithOtherUser:self.otherUserId otherDevice:self.otherDeviceId myUser:manager.crypto.mxSession.matrixRestClient.credentials];
         _creationDate = [NSDate date];
     }
     return self;

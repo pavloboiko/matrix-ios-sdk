@@ -49,18 +49,18 @@
 
 - (void)tearDown
 {
+    [super tearDown];
+
     [MXHTTPClient removeAllDelays];
     mxRestClient = nil;
     matrixSDKTestsData = nil;
-    
-    [super tearDown];
 }
 
 // Make sure MXTESTS_USER exists on the HS
 - (void)createTestAccount:(void (^)(void))onReady
 {
     // Register the user
-    MXHTTPOperation *operation = [mxRestClient registerWithLoginType:kMXLoginFlowTypeDummy username:MXTESTS_USER password:MXTESTS_PWD success:^(MXCredentials *credentials) {
+    [mxRestClient registerWithLoginType:kMXLoginFlowTypeDummy username:MXTESTS_USER password:MXTESTS_PWD success:^(MXCredentials *credentials) {
 
         onReady();
 
@@ -76,7 +76,6 @@
             XCTFail(@"Cannot create the test account");
         }
     }];
-    operation.maxNumberOfTries = 1;
 }
 
 - (void)testInit
@@ -168,84 +167,12 @@
     [self waitForExpectationsWithTimeout:10 handler:nil];
 }
 
-- (void)testUsernameAvailability
-{
-    XCTestExpectation *expectation = [self expectationWithDescription:@"asyncTest"];
-    
-    // Test with a random string as other tests may have already registered the test acounts
-    MXHTTPOperation *operation = [mxRestClient isUsernameAvailable:@"notyetregistered" success:^(MXUsernameAvailability *availability) {
-        
-        XCTAssertTrue(availability.available, @"The username should be available for registration.");
-        [expectation fulfill];
-        
-    } failure:^(NSError *error) {
-        
-        XCTFail(@"The request should not fail - the username should be available");
-        [expectation fulfill];
-        
-    }];
-    operation.maxNumberOfTries = 1;
-    
-    [self waitForExpectationsWithTimeout:10 handler:nil];
-}
-
-- (void)testUsernameAvailabilityForExistingUsername
-{
-    XCTestExpectation *expectation = [self expectationWithDescription:@"asyncTest"];
-    
-    [self createTestAccount:^{
-        MXHTTPOperation *operation = [mxRestClient isUsernameAvailable:MXTESTS_USER success:^(MXUsernameAvailability *availability) {
-            
-            XCTFail(@"The request should fail - the username should already be taken");
-            [expectation fulfill];
-            
-            } failure:^(NSError *error) {
-                
-                MXError *mxError = [[MXError alloc] initWithNSError:error];
-                
-                XCTAssertNotNil(mxError);
-                XCTAssertTrue([mxError.errcode isEqualToString:kMXErrCodeStringUserInUse], @"The error should indicate that the username is in use");
-                
-                [expectation fulfill];
-                
-            }];
-        operation.maxNumberOfTries = 1;
-    }];
-    
-    [self waitForExpectationsWithTimeout:10 handler:nil];
-}
-
-- (void)testUsernameAvailabilityForInvalidUsername
-{
-    XCTestExpectation *expectation = [self expectationWithDescription:@"asyncTest"];
-    
-    // Test a username that only has digits which is disallowed by the spec.
-    MXHTTPOperation *operation = [mxRestClient isUsernameAvailable:@"123456789" success:^(MXUsernameAvailability *availability) {
-        
-        XCTFail(@"The request should fail - the username should already be taken");
-        [expectation fulfill];
-        
-    } failure:^(NSError *error) {
-        
-        MXError *mxError = [[MXError alloc] initWithNSError:error];
-        
-        XCTAssertNotNil(mxError);
-        XCTAssertTrue([mxError.errcode isEqualToString:kMXErrCodeStringInvalidUsername], @"The error should indicate that the username is invalid");
-        
-        [expectation fulfill];
-        
-    }];
-    operation.maxNumberOfTries = 1;
-    
-    [self waitForExpectationsWithTimeout:10 handler:nil];
-}
-
 - (void)testRegisterWithDummyLoginType
 {
     XCTestExpectation *expectation = [self expectationWithDescription:@"asyncTest"];
 
     // Provide nil as username, the HS will provide one for us
-    MXHTTPOperation *operation = [mxRestClient registerWithLoginType:kMXLoginFlowTypeDummy username:nil password:MXTESTS_PWD success:^(MXCredentials *credentials) {
+    [mxRestClient registerWithLoginType:kMXLoginFlowTypeDummy username:nil password:MXTESTS_PWD success:^(MXCredentials *credentials) {
 
         XCTAssertNotNil(credentials);
         XCTAssertNotNil(credentials.homeServer);
@@ -258,7 +185,6 @@
         XCTFail(@"The request should not fail - NSError: %@", error);
         [expectation fulfill];
     }];
-    operation.maxNumberOfTries = 1;
 
     [self waitForExpectationsWithTimeout:10 handler:nil];
 }
@@ -270,7 +196,7 @@
     [self createTestAccount:^{
 
         // Register the same user
-        MXHTTPOperation *operation = [mxRestClient registerWithLoginType:kMXLoginFlowTypeDummy username:MXTESTS_USER password:MXTESTS_PWD success:^(MXCredentials *credentials) {
+        [mxRestClient registerWithLoginType:kMXLoginFlowTypeDummy username:MXTESTS_USER password:MXTESTS_PWD success:^(MXCredentials *credentials) {
 
             XCTFail(@"The request should fail (User already exists)");
 
@@ -286,7 +212,6 @@
 
             [expectation fulfill];
         }];
-        operation.maxNumberOfTries = 1;
     }];
 
     [self waitForExpectationsWithTimeout:10 handler:nil];
@@ -525,6 +450,7 @@
 
         // Result must be returned on the main queue by default
         XCTAssert([[NSThread currentThread] isMainThread]);
+        XCTAssertEqual(dispatch_get_current_queue(), dispatch_get_main_queue());
 
         [expectation fulfill];
 
@@ -545,10 +471,10 @@
 
     client.completionQueue = dispatch_queue_create("aQueueFromAnotherThread", DISPATCH_QUEUE_SERIAL);
 
-    MXHTTPOperation *operation = [client publicRoomsOnServer:nil limit:-1 since:nil filter:nil thirdPartyInstanceId:nil includeAllNetworks:NO success:^(MXPublicRoomsResponse *publicRoomsResponse) {
+    [client publicRoomsOnServer:nil limit:-1 since:nil filter:nil thirdPartyInstanceId:nil includeAllNetworks:NO success:^(MXPublicRoomsResponse *publicRoomsResponse) {
 
         XCTAssertFalse([[NSThread currentThread] isMainThread]);
-        XCTAssertEqual(dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL), "aQueueFromAnotherThread");
+        XCTAssertEqual(dispatch_get_current_queue(), client.completionQueue);
 
         [expectation fulfill];
 
@@ -556,7 +482,6 @@
         XCTFail(@"The request should not fail - NSError: %@", error);
         [expectation fulfill];
     }];
-    operation.maxNumberOfTries = 1;
 
     [self waitForExpectationsWithTimeout:10 handler:nil];
 }
@@ -578,7 +503,7 @@
     } failure:^(NSError *error) {
 
         XCTAssertFalse([[NSThread currentThread] isMainThread]);
-        XCTAssertEqual(dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL), "aQueueFromAnotherThread");
+        XCTAssertEqual(dispatch_get_current_queue(), client.completionQueue);
 
         [expectation fulfill];
     }];

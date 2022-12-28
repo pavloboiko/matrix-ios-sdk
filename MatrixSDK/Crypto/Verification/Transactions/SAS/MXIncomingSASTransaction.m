@@ -29,11 +29,11 @@
 
 - (void)accept;
 {
-    MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] accept");
+    NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] accept");
 
     if (self.state != MXSASTransactionStateIncomingShowAccept)
     {
-        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] accept: wrong state: %@", self);
+        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] accept: wrong state: %@", self);
         [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
         return;
     }
@@ -66,14 +66,14 @@
             self.state = MXSASTransactionStateWaitForPartnerKey;
         } failure:^(NSError * _Nonnull error) {
 
-            MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] accept: sendToOther:kMXEventTypeStringKeyVerificationAccept failed. Error: %@", error);
+            NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] accept: sendToOther:kMXEventTypeStringKeyVerificationAccept failed. Error: %@", error);
             self.error = error;
             self.state = MXSASTransactionStateError;
         }];
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] accept: Failed to find agreement");
+        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] accept: Failed to find agreement");
         [self cancelWithCancelCode:MXTransactionCancelCode.unknownMethod];
         return;
     }
@@ -82,13 +82,13 @@
 
 #pragma mark - SDK-Private methods -
 
-- (nullable instancetype)initWithOtherDevice:(MXDeviceInfo *)otherDevice startEvent:(MXEvent *)event andManager:(MXLegacyKeyVerificationManager *)manager
+- (nullable instancetype)initWithOtherDevice:(MXDeviceInfo *)otherDevice startEvent:(MXEvent *)event andManager:(MXKeyVerificationManager *)manager
 {
     MXSASKeyVerificationStart *startContent;
     MXJSONModelSetMXJSONModel(startContent, MXSASKeyVerificationStart, event.content);
     if (!startContent || !startContent.isValid)
     {
-        MXLogDebug(@"[MXKeyVerificationTransaction]: ERROR: Invalid start event: %@", event);
+        NSLog(@"[MXKeyVerificationTransaction]: ERROR: Invalid start event: %@", event);
         return nil;
     }
     
@@ -113,7 +113,7 @@
         if (![self.startContent.method isEqualToString:MXKeyVerificationMethodSAS]
             || ![self.startContent.shortAuthenticationString containsObject:MXKeyVerificationSASModeDecimal])
         {
-            MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction]: ERROR: Invalid start event: %@", event);
+            NSLog(@"[MXKeyVerification][MXIncomingSASTransaction]: ERROR: Invalid start event: %@", event);
             return nil;
         }
 
@@ -129,25 +129,25 @@
 
 - (void)handleAccept:(MXKeyVerificationAccept*)acceptContent
 {
-    MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleAccept");
+    NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleAccept");
 
     [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
 }
 
 - (void)handleKey:(MXKeyVerificationKey *)keyContent
 {
-    MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey");
+    NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey");
 
     if (self.state != MXSASTransactionStateWaitForPartnerKey)
     {
-        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: wrong state: %@. keyContent: %@", self, keyContent);
+        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: wrong state: %@. keyContent: %@", self, keyContent);
         [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
         return;
     }
     
     if (!keyContent.isValid)
     {
-        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: key content is invalid. keyContent: %@", keyContent);
+        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: key content is invalid. keyContent: %@", keyContent);
         [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
         return;
     }
@@ -165,18 +165,16 @@
     [self sendToOther:kMXEventTypeStringKeyVerificationKey content:bobKeyContent.JSONDictionary success:^{
         MXStrongifyAndReturnIfNil(self);
 
-        self.sasBytes = [self generateSasBytesWithTheirPublicKey:keyContent.key
-                                                requestingDevice:self.otherDevice sasPublicKey:keyContent.key
-                                                     otherDevice:self.manager.crypto.myDevice otherSasPublicKey:self.olmSAS.publicKey];
+        self.sasBytes = [self generateSasBytesWithTheirPublicKey:keyContent.key requestingDevice:self.otherDevice otherDevice:self.manager.crypto.myDevice];
 
-//        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: BOB CODE: %@", self.sasDecimal);
-//        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: BOB EMOJI CODE: %@", self.sasEmoji);
+//        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: BOB CODE: %@", self.sasDecimal);
+//        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: BOB EMOJI CODE: %@", self.sasEmoji);
 
         self.state = MXSASTransactionStateShowSAS;
 
     } failure:^(NSError * _Nonnull error) {
 
-        MXLogDebug(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: sendToOther:kMXEventTypeStringKeyVerificationKey failed. Error: %@", error);
+        NSLog(@"[MXKeyVerification][MXIncomingSASTransaction] handleKey: sendToOther:kMXEventTypeStringKeyVerificationKey failed. Error: %@", error);
         self.error = error;
         self.state = MXSASTransactionStateError;
     }];

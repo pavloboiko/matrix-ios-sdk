@@ -41,12 +41,11 @@ FOUNDATION_EXPORT NSString * const kMXTestsAliceAvatarURL;
 
 #pragma mark - mxBob
 // Credentials for the user mxBob on the home server located at kMXTestsHomeServerURL
-@property (nonatomic, strong, readonly) MXCredentials *bobCredentials;
+@property (nonatomic, readonly) MXCredentials *bobCredentials;
 
 // Get credentials asynchronously
 // The user will be created if needed
-- (void)getBobCredentials:(XCTestCase*)testCase
-              readyToTest:(void (^)(void))readyToTest;
+- (void)getBobCredentials:(void (^)(void))success;
 
 // Prepare a test with a MXRestClient for mxBob so that we can make test on it
 - (void)doMXRestClientTestWithBob:(XCTestCase*)testCase
@@ -91,7 +90,7 @@ FOUNDATION_EXPORT NSString * const kMXTestsAliceAvatarURL;
 
 
 #pragma mark - mxAlice
-@property (nonatomic, strong, readonly) MXCredentials *aliceCredentials;
+@property (nonatomic, readonly) MXCredentials *aliceCredentials;
 
 - (void)doMXRestClientTestWithAlice:(XCTestCase*)testCase
                         readyToTest:(void (^)(MXRestClient *aliceRestClient, XCTestExpectation *expectation))readyToTest;
@@ -104,8 +103,8 @@ FOUNDATION_EXPORT NSString * const kMXTestsAliceAvatarURL;
 
 #pragma mark - both
 // The id and alias used for the public room created with *ThePublicRoom* methods
-@property (nonatomic, strong, readonly) NSString *thePublicRoomId;
-@property (nonatomic, strong, readonly) NSString *thePublicRoomAlias;
+@property (nonatomic,readonly) NSString *thePublicRoomId;
+@property (nonatomic,readonly) NSString *thePublicRoomAlias;
 
 - (void)doMXRestClientTestWithBobAndAliceInARoom:(XCTestCase*)testCase
                                      readyToTest:(void (^)(MXRestClient *bobRestClient, MXRestClient *aliceRestClient, NSString* roomId, XCTestExpectation *expectation))readyToTest;
@@ -129,11 +128,8 @@ FOUNDATION_EXPORT NSString * const kMXTestsAliceAvatarURL;
 
 
 #pragma mark - HTTPS mxBob
-- (void)getHttpsBobCredentials:(XCTestCase*)testCase
-                   readyToTest:(void (^)(void))readyToTest;
-- (void)getHttpsBobCredentials:(XCTestCase*)testCase
-                   readyToTest:(void (^)(void))readyToTest
-onUnrecognizedCertificateBlock:(MXHTTPClientOnUnrecognizedCertificate)onUnrecognizedCertBlock;
+- (void)getHttpsBobCredentials:(void (^)(void))success;
+- (void)getHttpsBobCredentials:(void (^)(void))success onUnrecognizedCertificateBlock:(MXHTTPClientOnUnrecognizedCertificate)onUnrecognizedCertBlock;
 
 - (void)doHttpsMXRestClientTestWithBob:(XCTestCase*)testCase
                            readyToTest:(void (^)(MXRestClient *bobRestClient, XCTestExpectation *expectation))readyToTest;
@@ -142,45 +138,17 @@ onUnrecognizedCertificateBlock:(MXHTTPClientOnUnrecognizedCertificate)onUnrecogn
 
 
 #pragma mark - tools
-
-// Stop the given test with a failure reason.
-// This method stop the execution of the test.
-- (void)breakTestCase:(XCTestCase*)testCase reason:(NSString *)reason, ...;
-
 // Logout the user on the server and log the user in with a new device
-- (void)relogUserSession:(XCTestCase*)testCase
-                 session:(MXSession*)session
-            withPassword:(NSString*)password
-              onComplete:(void (^)(MXSession *newSession))onComplete;
+- (void)relogUserSession:(MXSession*)session withPassword:(NSString*)password onComplete:(void (^)(MXSession *newSession))onComplete;
 
 // Close the current session by erasing the crypto to store  and log the user in with a new device
-- (void)relogUserSessionWithNewDevice:(XCTestCase*)testCase
-                              session:(MXSession*)session
-                         withPassword:(NSString*)password
-                           onComplete:(void (^)(MXSession *newSession))onComplete;
+- (void)relogUserSessionWithNewDevice:(MXSession*)session withPassword:(NSString*)password onComplete:(void (^)(MXSession *newSession))onComplete;
 
-// Log the user on a new device
-- (void)loginUserOnANewDevice:(XCTestCase*)testCase
-                  credentials:(MXCredentials*)credentials
-                 withPassword:(NSString*)password
-              sessionToLogout:(MXSession*)sessionToLogout
-              newSessionStore:(id<MXStore>)newSessionStore
-              startNewSession:(BOOL)startNewSession
-                          e2e:(BOOL)e2e
-                   onComplete:(void (^)(MXSession *newSession))onComplete;
-
-- (void)for:(MXRestClient *)mxRestClient2 andRoom:(NSString*)roomId sendMessages:(NSUInteger)messagesCount testCase:(XCTestCase*)testCase success:(void (^)(void))success;
+- (void)for:(MXRestClient *)mxRestClient2 andRoom:(NSString*)roomId sendMessages:(NSUInteger)messagesCount success:(void (^)(void))success;
 
 
 #pragma mark Reference keeping
-
-/// Close automatically MXSession instances created by MatrixSDKTestsData.
-/// True by default.
-/// Those instances are closed on MatrixSDKTestsData.deinit()
-@property (nonatomic) BOOL autoCloseMXSessions;
-
 // Retain an object for the life of this MatrixSDKTestsData instance
 - (void)retain:(NSObject*)object;
-- (void)release:(NSObject*)object;
 
 @end

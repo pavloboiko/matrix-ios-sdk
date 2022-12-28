@@ -17,8 +17,6 @@
 #import <Foundation/Foundation.h>
 
 #import "MXWellKnown.h"
-#import "MXCapabilities.h"
-#import "MXMatrixVersions.h"
 
 @interface MXFileStoreMetaData : NSObject <NSCoding, NSCopying>
 
@@ -54,28 +52,8 @@
 @property (nonatomic) NSDictionary *userAccountData;
 
 /**
- State of agreement to the identity server's terms of service.
- */
-@property (nonatomic) BOOL areAllIdentityServerTermsAgreed;
-
-/**
  The homeserver .well-known.
  */
 @property (nonatomic) MXWellKnown *homeserverWellknown;
-
-/**
- The homeserver capabilities.
- */
-@property (nonatomic) MXCapabilities *homeserverCapabilities;
-
-/**
- Supported Matrix versions.
- */
-@property (nonatomic) MXMatrixVersions *supportedMatrixVersions;
-
-/**
- The maximum size an upload can be in bytes.
- */
-@property (nonatomic) NSInteger maxUploadSize;
 
 @end

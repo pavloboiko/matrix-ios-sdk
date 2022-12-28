@@ -1,6 +1,5 @@
 /*
  Copyright 2017 Avery Pierce
- Copyright 2021 The Matrix.org Foundation C.I.C
  
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -47,10 +46,9 @@ import Foundation
      }
  
  */
-@frozen public enum MXResponse<T> {
+public enum MXResponse<T> {
     case success(T)
     case failure(Error)
-    // Note: Additional cases break binary compatibility
     
     /// Indicates whether the API call was successful
     public var isSuccess: Bool {
@@ -131,25 +129,6 @@ private extension MXResponse {
 
 
 
-public extension MXResponse where T: MXSummable {
-    static func +(lhs: MXResponse<T>, rhs: MXResponse<T>) -> MXResponse<T> {
-        
-        // Once there is an error, the result will be an error
-        switch (lhs, rhs) {
-            case (.failure(_), _):
-                return lhs
-            case (_, .failure(_)):
-                return rhs
-            case (.success(let lhsT), .success(let rhsT)):
-                return .success(lhsT + rhsT)
-        }
-    }
-}
-
-
-
-
-
 
 /**
  Return a closure that accepts any object, converts it to a MXResponse value, and then
@@ -197,48 +176,11 @@ internal func curryFailure<T>(_ completion: @escaping (MXResponse<T>) -> Void) -
     return { completion(.fromOptional(error: $0)) }
 }
 
-/// Call success and failure closures from a MXResponse, useful to expose Swift function to Objective-C
-internal func uncurryResponse<T>(_ response: MXResponse<T>, success: @escaping (T) -> Void, failure: @escaping (Error) -> Void) {
-    switch response {
-    case .success(let object):
-        success(object)
-    case .failure(let error):
-        failure(error)
-    }
-}
 
-/// Async wrapper over callback-based functions returning `MXResponse<T>`
-///
-/// Example:
-///
-/// ```
-/// // Legacy callback approach
-/// room.members { response
-///     switch response {
-///     case .succes:
-///         ...
-///     case. failure:
-///         ...
-///     }
-/// }
-///
-/// // Async approach
-/// let members = try await performCallbackRequest {
-///     room.members($0)
-/// }
-/// ```
-internal func performCallbackRequest<T>(_ request: (@escaping (MXResponse<T>) -> Void) -> Void) async throws -> T {
-    return try await withCheckedThrowingContinuation { continuation in
-        request {
-            switch $0 {
-            case .success(let response):
-                continuation.resume(returning: response)
-            case .failure(let error):
-                continuation.resume(throwing: error)
-            }
-        }
-    }
-}
+
+
+
+
 
 /**
  Reports ongoing progress of a process, and encapsulates relevant

@@ -33,12 +33,4 @@
     return data;
 }
 
-- (NSDictionary *)JSONDictionary
-{
-    return @{
-        @"url": _url ?: [NSNull null],
-        @"format": _format ?: [NSNull null]
-    };
-}
-
 @end

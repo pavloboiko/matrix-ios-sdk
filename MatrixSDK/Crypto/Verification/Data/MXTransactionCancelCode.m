@@ -87,9 +87,4 @@
     return [[MXTransactionCancelCode alloc] initWithValue:@"m.qr_code.invalid" humanReadable:@"Invalid QR code"];
 }
 
-+ (instancetype)accepted
-{
-    return [[MXTransactionCancelCode alloc] initWithValue:@"m.accepted" humanReadable:@"Verification request accepted by another device"];
-}
-
 @end

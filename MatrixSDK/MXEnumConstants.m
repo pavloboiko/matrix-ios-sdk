@@ -22,7 +22,7 @@
  Matrix content respository path
  */
 NSString *const kMXContentUriScheme  = @"mxc://";
-NSString *const kMXContentPrefixPath = @"_matrix/media/r0";
+NSString *const kMXContentPrefixPath = @"_matrix/media/v1";
 
 /**
  Prefix used in path of antivirus server API requests.
@@ -54,11 +54,10 @@ NSString *const kMXRoomHistoryVisibilityJoined       = @"joined";
 /**
  Room join rule.
  */
-NSString *const kMXRoomJoinRulePublic       = @"public";
-NSString *const kMXRoomJoinRuleInvite       = @"invite";
-NSString *const kMXRoomJoinRulePrivate      = @"private";
-NSString *const kMXRoomJoinRuleKnock        = @"knock";
-NSString *const kMXRoomJoinRuleRestricted   = @"restricted";
+NSString *const kMXRoomJoinRulePublic  = @"public";
+NSString *const kMXRoomJoinRuleInvite  = @"invite";
+NSString *const kMXRoomJoinRulePrivate = @"private";
+NSString *const kMXRoomJoinRuleKnock   = @"knock";
 
 /**
  Room presets
@@ -76,3 +75,17 @@ NSString *const kMXRoomGuestAccessForbidden = @"forbidden";
 NSString *const kMXRoomMessageFormatHTML = @"org.matrix.custom.html";
 
 NSString *const kMXMatrixDotToUrl = @"https://matrix.to";
+
+
+#pragma mark - Analytics
+
+NSString *const kMXAnalyticsStartupCategory = @"startup";
+
+NSString *const kMXAnalyticsStartupInititialSync = @"initialSync";
+NSString *const kMXAnalyticsStartupIncrementalSync = @"incrementalSync";
+NSString *const kMXAnalyticsStartupStorePreload = @"storePreload";
+NSString *const kMXAnalyticsStartupMountData = @"mountData";
+NSString *const kMXAnalyticsStartupLaunchScreen = @"launchScreen";
+
+NSString *const kMXAnalyticsStatsCategory = @"stats";
+NSString *const kMXAnalyticsStatsRooms = @"rooms";

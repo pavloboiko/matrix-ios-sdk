@@ -24,6 +24,8 @@
 @interface MXMyUserTests : XCTestCase
 {
     MatrixSDKTestsData *matrixSDKTestsData;
+
+    MXSession *mxSession;
 }
 @end
 
@@ -38,6 +40,12 @@
 
 - (void)tearDown
 {
+    if (mxSession)
+    {
+        [mxSession close];
+        mxSession = nil;
+    }
+
     matrixSDKTestsData = nil;
     
     [super tearDown];
@@ -45,7 +53,9 @@
 
 - (void)testMXSessionMyUser
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+
+        mxSession = mxSession2;
 
         XCTAssertNotNil(mxSession.myUser);
 
@@ -60,8 +70,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithAlice:self readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:mxSession];
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
 
         XCTAssertNil(mxSession.myUser, @"There should be no myUser while initialSync is not done");
 
@@ -98,8 +107,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithAlice:self readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:mxSession];
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
 
         [mxSession start:^{
 
@@ -135,8 +143,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithAlice:self readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:mxSession];
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
 
         [mxSession start:^{
 
@@ -171,7 +178,9 @@
 
 - (void)testIdenticon
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+
+        mxSession = mxSession2;
 
         MXUser *myUser = [mxSession userWithUserId:mxSession.matrixRestClient.credentials.userId];
 

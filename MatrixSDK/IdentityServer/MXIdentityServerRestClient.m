@@ -63,24 +63,24 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return self.httpClient.accessToken;
 }
 
-- (void)setTokenValidationResponseHandler:(MXHTTPClientTokenValidationResponseHandler)tokenValidationResponseHandler
+- (void)setShouldRenewTokenHandler:(MXHTTPClientShouldRenewTokenHandler)shouldRenewTokenHandler
 {
-    self.httpClient.tokenValidationResponseHandler = tokenValidationResponseHandler;
+    self.httpClient.shouldRenewTokenHandler = shouldRenewTokenHandler;
 }
 
-- (MXHTTPClientTokenValidationResponseHandler)tokenValidationResponseHandler
+- (MXHTTPClientShouldRenewTokenHandler)shouldRenewTokenHandler
 {
-    return self.httpClient.tokenValidationResponseHandler;
+    return self.httpClient.shouldRenewTokenHandler;
 }
 
-- (void)setTokenProviderHandler:(MXHTTPClientTokenProviderHandler)tokenProviderHandler
+- (void)setRenewTokenHandler:(MXHTTPClientRenewTokenHandler)renewTokenHandler
 {
-    self.httpClient.tokenProviderHandler = tokenProviderHandler;
+    self.httpClient.renewTokenHandler = renewTokenHandler;
 }
 
-- (MXHTTPClientTokenProviderHandler)tokenProviderHandler
+- (MXHTTPClientRenewTokenHandler)renewTokenHandler
 {
-    return self.httpClient.tokenProviderHandler;
+    return self.httpClient.renewTokenHandler;
 }
 
 - (BOOL)isUsingV2API
@@ -97,7 +97,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     self = [super init];
     if (self)
     {
-        MXHTTPClient *httpClient = [[MXHTTPClient alloc] initWithBaseURL:identityServer authenticated:accessToken!=nil andOnUnrecognizedCertificateBlock:onUnrecognizedCertBlock];
+        MXHTTPClient *httpClient = [[MXHTTPClient alloc] initWithBaseURL:identityServer accessToken:accessToken andOnUnrecognizedCertificateBlock:onUnrecognizedCertBlock];
         // The identity server accepts parameters in form data form for some requests
         httpClient.requestParametersInJSON = NO;
 
@@ -173,7 +173,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return [self.httpClient requestWithMethod:@"GET"
                                          path:path
                                    parameters:nil
-                           needsAuthentication:YES
+                           needsAuthorization:YES
                                       success:^(NSDictionary *JSONResponse) {
                                           if (success)
                                           {
@@ -316,7 +316,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return [self.httpClient requestWithMethod:@"GET"
                                          path:path
                                    parameters:nil
-                          needsAuthentication:YES
+                           needsAuthorization:YES
                                       success:^(NSDictionary *JSONResponse) {
                                           if (success)
                                           {
@@ -417,7 +417,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return [self.httpClient requestWithMethod:@"POST"
                                          path:path
                                    parameters:nil
-                          needsAuthentication:YES
+                           needsAuthorization:YES
                                          data:payloadData
                                       headers:@{@"Content-Type": @"application/json"}
                                       timeout:-1
@@ -517,7 +517,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return [self.httpClient requestWithMethod:@"POST"
                                          path:path
                                    parameters:nil
-                          needsAuthentication:self.isUsingV2API
+                           needsAuthorization:self.isUsingV2API
                                          data:payloadData
                                       headers:@{@"Content-Type": @"application/json"}
                                       timeout:-1
@@ -571,7 +571,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return [self.httpClient requestWithMethod:@"POST"
                                          path:path
                                    parameters:nil
-                          needsAuthentication:self.isUsingV2API
+                           needsAuthorization:self.isUsingV2API
                                          data:payloadData
                                       headers:@{@"Content-Type": @"application/json"}
                                       timeout:-1
@@ -629,7 +629,7 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
     return [self.httpClient requestWithMethod:@"POST"
                                          path:apiPath
                                    parameters:nil
-                          needsAuthentication:self.isUsingV2API
+                           needsAuthorization:self.isUsingV2API
                                          data:payloadData
                                       headers:@{@"Content-Type": @"application/json"}
                                       timeout:-1
@@ -736,6 +736,12 @@ NSString *const MXIdentityServerRestClientErrorDomain = @"org.matrix.sdk.MXIdent
                                       } failure:^(NSError *error) {
                                           [self dispatchFailure:error inBlock:failure];
                                       }];
+}
+
+- (MXHTTPOperation *)getAccessTokenAndRenewIfNeededWithSuccess:(void (^)(NSString *accessToken))success
+                                                       failure:(void (^)(NSError *error))failure
+{
+    return [self.httpClient getAccessTokenAndRenewIfNeededWithSuccess:success failure:failure];
 }
 
 #pragma mark - Private methods

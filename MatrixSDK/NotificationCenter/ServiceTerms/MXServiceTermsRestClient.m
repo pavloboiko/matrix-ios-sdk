@@ -31,13 +31,7 @@
     self = [super init];
     if (self)
     {
-        _httpClient = [[MXHTTPClient alloc] initWithBaseURL:baseUrl authenticated:YES andOnUnrecognizedCertificateBlock:nil];
-        _httpClient.tokenProviderHandler = ^(NSError *error, void (^success)(NSString *accessToken), void (^failure)(NSError *error)) {
-            success(accessToken);
-        };
-        _httpClient.tokenValidationResponseHandler = ^BOOL(NSError *error) {
-            return false;
-        };
+        _httpClient = [[MXHTTPClient alloc] initWithBaseURL:baseUrl accessToken:accessToken andOnUnrecognizedCertificateBlock:nil];
     }
     return self;
 }

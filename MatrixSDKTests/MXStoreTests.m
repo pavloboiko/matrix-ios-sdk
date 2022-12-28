@@ -83,8 +83,6 @@
         }
 
         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
         [mxSession setStore:store success:^{
 
             [mxSession start:^{
@@ -117,7 +115,7 @@
 
     [matrixSDKTestsData doMXRestClientTestWithBobAndAliceInARoom:testCase readyToTest:^(MXRestClient *bobRestClient, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation2) {
 
-        [matrixSDKTestsData for:bobRestClient andRoom:roomId sendMessages:5 testCase:testCase success:^{
+        [matrixSDKTestsData for:bobRestClient andRoom:roomId sendMessages:5 success:^{
 
             if (!expectation)
             {
@@ -125,7 +123,6 @@
             }
 
             mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-            [matrixSDKTestsData retain:mxSession];
 
             [mxSession setStore:store success:^{
                 [mxSession start:^{
@@ -166,7 +163,6 @@
         }
 
         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
 
         [mxSession setStore:store success:^{
 
@@ -275,7 +271,7 @@
 
     __block NSUInteger eventCount = 0;
 
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
         [liveTimeline listenToEventsOfTypes:eventsFilterForMessages onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -308,7 +304,7 @@
 
     __block NSUInteger eventCount = 0;
 
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
         [liveTimeline listenToEventsOfTypes:eventsFilterForMessages onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -345,7 +341,7 @@
 
     __block uint64_t prev_ts = -1;
 
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
         [liveTimeline listenToEventsOfTypes:eventsFilterForMessages onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -374,7 +370,7 @@
 {
     __block NSUInteger eventCount = 0;
     __block NSMutableArray *events = [NSMutableArray array];
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
         [liveTimeline listenToEventsOfTypes:nil onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -403,7 +399,7 @@
 - (void)checkSeveralPaginateBacks:(MXRoom*)room
 {
     __block NSMutableArray *roomEvents = [NSMutableArray array];
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
         [liveTimeline listenToEventsOfTypes:nil onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
             [roomEvents addObject:event];
@@ -417,7 +413,7 @@
 
             __block NSMutableArray *room2Events = [NSMutableArray array];
 
-            [room2 liveTimeline:^(id<MXEventTimeline> room2LiveTimeline) {
+            [room2 liveTimeline:^(MXEventTimeline *room2LiveTimeline) {
 
                 [room2LiveTimeline listenToEventsOfTypes:nil onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -442,7 +438,7 @@
                     [room2LiveTimeline paginate:5 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^() {
 
                         // Log room2 to keep a ref on it up to here
-                        MXLogDebug(@"%@", room2);
+                        NSLog(@"%@", room2);
 
                         [room2LiveTimeline paginate:100 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^() {
 
@@ -494,7 +490,7 @@
     MXRoom *room2 = [[MXRoom alloc] initWithRoomId:room.roomId andMatrixSession:mxSession];
 
     __block NSMutableArray *room2Events = [NSMutableArray array];
-    [room2 liveTimeline:^(id<MXEventTimeline> room2liveTimeline) {
+    [room2 liveTimeline:^(MXEventTimeline *room2liveTimeline) {
 
         [room2liveTimeline listenToEventsOfTypes:nil onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -506,7 +502,7 @@
 
         __block NSUInteger liveEvents = 0;
 
-        [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+        [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
             [liveTimeline listenToEventsOfTypes:nil onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -529,8 +525,8 @@
                             }
 
                             // Try with 2 more live events
-                            [room sendTextMessage:@"How is the pagination #2?" threadId:nil success:nil failure:nil];
-                            [room sendTextMessage:@"How is the pagination #3?" threadId:nil success:nil failure:nil];
+                            [room sendTextMessage:@"How is the pagination #2?" success:nil failure:nil];
+                            [room sendTextMessage:@"How is the pagination #3?" success:nil failure:nil];
 
                         } failure:^(NSError *error) {
                             XCTFail(@"The request should not fail - NSError: %@", error);
@@ -542,7 +538,7 @@
                         [room2liveTimeline paginate:5 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^() {
 
                             // Log room2 to keep a ref on it up to here
-                            MXLogDebug(@"%@", room2);
+                            NSLog(@"%@", room2);
                             
                             [room2liveTimeline paginate:100 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^() {
 
@@ -586,7 +582,7 @@
                 // Start checking pagination from the cache
                 [room2liveTimeline resetPagination];
 
-                [room sendTextMessage:@"How is the pagination #1?" threadId:nil success:nil failure:nil];
+                [room sendTextMessage:@"How is the pagination #1?" success:nil failure:nil];
 
             } failure:^(NSError *error) {
                 XCTFail(@"The request should not fail - NSError: %@", error);
@@ -599,7 +595,7 @@
 
 - (void)checkCanPaginateFromHomeServer:(MXRoom*)room
 {
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
         [liveTimeline resetPagination];
         XCTAssertTrue([liveTimeline canPaginate:MXTimelineDirectionBackwards], @"We can always paginate at the beginning");
 
@@ -626,7 +622,7 @@
 
 - (void)checkCanPaginateFromMXStore:(MXRoom*)room
 {
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
         [liveTimeline resetPagination];
         XCTAssertTrue([liveTimeline canPaginate:MXTimelineDirectionBackwards], @"We can always paginate at the beginning");
@@ -654,138 +650,91 @@
 
 - (void)checkLastMessageAfterPaginate:(MXRoom*)room
 {
-    [room.mxSession eventWithEventId:room.summary.lastMessage.eventId
-                              inRoom:room.roomId
-                             success:^(MXEvent *lastMessage) {
-        
-        XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMessage);
+    MXEvent *lastMessage = room.summary.lastMessageEvent;
+    XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMessage);
 
-        [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
-            [liveTimeline resetPagination];
-            XCTAssertEqualObjects(room.summary.lastMessage.eventId, lastMessage.eventId,  @"The last message should stay the same");
+        [liveTimeline resetPagination];
+        MXEvent *lastMessage2 = room.summary.lastMessageEvent;
+        XCTAssertEqualObjects(lastMessage2.eventId, lastMessage.eventId,  @"The last message should stay the same");
 
-            [liveTimeline paginate:100 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^() {
+        [liveTimeline paginate:100 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^() {
 
-                XCTAssertEqualObjects(room.summary.lastMessage.eventId, lastMessage.eventId,  @"The last message should stay the same");
+            MXEvent *lastMessage3 = room.summary.lastMessageEvent;
+            XCTAssertEqualObjects(lastMessage3.eventId, lastMessage.eventId,  @"The last message should stay the same");
 
-                [expectation fulfill];
+            [expectation fulfill];
 
-            } failure:^(NSError *error) {
-                XCTFail(@"The request should not fail - NSError: %@", error);
-                [expectation fulfill];
-            }];
+        } failure:^(NSError *error) {
+            XCTFail(@"The request should not fail - NSError: %@", error);
+            [expectation fulfill];
         }];
-        
-    } failure:^(NSError *error) {
-        XCTFail(@"The request should not fail - NSError: %@", error);
-        [expectation fulfill];
     }];
 }
 
 - (void)checkLastMessageProfileChange:(MXRoom*)room
 {
-    [room.mxSession eventWithEventId:room.summary.lastMessage.eventId
-                              inRoom:room.roomId
-                             success:^(MXEvent *lastMessage) {
-        
-        XCTAssertNotNil(lastMessage);
-        XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMessage);
+    MXEvent *lastMessage = room.summary.lastMessageEvent;
+    XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMessage);
 
-        [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
-            [liveTimeline listenToEvents:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
+        [liveTimeline listenToEvents:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
-                // The room summary is handled afterwards
-                if (!observer)
-                {
-                    observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXRoomSummaryDidChangeNotification object:room.summary queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+            // The room summary is handled afterwards
+            if (!observer)
+            {
+                observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXRoomSummaryDidChangeNotification object:room.summary queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
 
-                        [room.mxSession eventWithEventId:room.summary.lastMessage.eventId
-                                                  inRoom:room.roomId
-                                                 success:^(MXEvent *lastMessage2) {
-                            
-                            XCTAssertNotNil(lastMessage2);
-                            XCTAssertEqual(lastMessage2.eventType, MXEventTypeRoomMember);
-                            XCTAssertNotEqualObjects(room.summary.lastMessage.eventId, lastMessage.eventId);
-
-                            [expectation fulfill];
-                            
-                        } failure:^(NSError *error) {
-                            XCTFail(@"The request should not fail - NSError: %@", error);
-                            [expectation fulfill];
-                        }];
-                        
-                    }];
-                }
-            }];
-        }];
-
-        [room.mxSession.myUser setDisplayName:@"Toto" success:nil failure:^(NSError *error) {
-            XCTFail(@"The request should not fail - NSError: %@", error);
-            [expectation fulfill];
-        }];
-        
-    } failure:^(NSError *error) {
-        XCTFail(@"The request should not fail - NSError: %@", error);
-        [expectation fulfill];
-    }];
-    
-}
-
-- (void)checkLastMessageEventTypesAllowList:(MXRoom*)room
-{
-    [room.mxSession eventWithEventId:room.summary.lastMessage.eventId
-                              inRoom:room.roomId
-                             success:^(MXEvent *lastMessage) {
-        
-        XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMessage);
-
-        // Only allow message events to become the last message.
-        MXRoomSummaryUpdater *updater = [MXRoomSummaryUpdater roomSummaryUpdaterForSession:room.mxSession];
-        updater.lastMessageEventTypesAllowList = @[kMXEventTypeStringRoomMessage];
-
-        [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
-            [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMember] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
-
-                [room.mxSession eventWithEventId:room.summary.lastMessage.eventId
-                                          inRoom:room.roomId
-                                         success:^(MXEvent *lastMessage2) {
-                    
+                    MXEvent *lastMessage2 = room.summary.lastMessageEvent;
                     XCTAssertNotNil(lastMessage2);
-                    XCTAssertEqual(lastMessage2.eventType, MXEventTypeRoomMessage);
-                    XCTAssertEqualObjects(lastMessage2.eventId, lastMessage.eventId);
+                    XCTAssertEqual(lastMessage2.eventType, MXEventTypeRoomMember);
+                    XCTAssertNotEqualObjects(lastMessage2.eventId, lastMessage.eventId);
 
-                    // The room.summary.lastMessageEvent must no be updated in this case
-                    [[NSNotificationCenter defaultCenter] addObserverForName:kMXRoomSummaryDidChangeNotification object:room.summary queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
-
-                        XCTFail(@"The room.summary.lastMessageEvent must no be updated in this case");
-
-                    }];
-
-                    [expectation fulfill];
-                    
-                } failure:^(NSError *error) {
-                    XCTFail(@"The request should not fail - NSError: %@", error);
                     [expectation fulfill];
                 }];
-                
-            }];
+            }
         }];
+    }];
 
-        [room.mxSession.myUser setDisplayName:@"Toto" success:nil failure:^(NSError *error) {
-            XCTFail(@"The request should not fail - NSError: %@", error);
-            [expectation fulfill];
-        }];
-        
-    } failure:^(NSError *error) {
+    [room.mxSession.myUser setDisplayName:@"Toto" success:nil failure:^(NSError *error) {
         XCTFail(@"The request should not fail - NSError: %@", error);
         [expectation fulfill];
     }];
 }
 
-- (void)checkLastMessageIgnoreProfileChange:(MXRoom *)room
+- (void)checkLastMessageIgnoreProfileChange:(MXRoom*)room
 {
-    // Not implemented
+    MXEvent *lastMessage = room.summary.lastMessageEvent;
+    XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMessage);
+
+    // Ignore profile change
+    MXRoomSummaryUpdater *updater = [MXRoomSummaryUpdater roomSummaryUpdaterForSession:room.mxSession];
+    updater.ignoreMemberProfileChanges = YES;
+
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
+        [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMember] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
+
+            MXEvent *lastMessage2 = room.summary.lastMessageEvent;
+            XCTAssertNotNil(lastMessage2);
+            XCTAssertEqual(lastMessage2.eventType, MXEventTypeRoomMessage);
+            XCTAssertEqualObjects(lastMessage2.eventId, lastMessage.eventId);
+
+            // The room.summary.lastMessageEvent must no be updated in this case
+            [[NSNotificationCenter defaultCenter] addObserverForName:kMXRoomSummaryDidChangeNotification object:room.summary queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+
+                XCTFail(@"The room.summary.lastMessageEvent must no be updated in this case");
+
+            }];
+
+            [expectation fulfill];
+        }];
+    }];
+
+    [room.mxSession.myUser setDisplayName:@"Toto" success:nil failure:^(NSError *error) {
+        XCTFail(@"The request should not fail - NSError: %@", error);
+        [expectation fulfill];
+    }];
 }
 
 - (void)checkPaginateWhenJoiningAgainAfterLeft:(MXRoom*)room
@@ -817,7 +766,7 @@
                     [room2 join:^{
 
                         NSMutableArray *events = [NSMutableArray array];
-                        [room2 liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                        [room2 liveTimeline:^(MXEventTimeline *liveTimeline) {
                             [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
                                 if (direction == MXTimelineDirectionBackwards)
@@ -863,7 +812,7 @@
                 // Make Bob the room
                 [room leave:^{
 
-                    [aliceRestClient sendTextMessageToRoom:roomId threadId:nil text:@"Hi bob" success:^(NSString *eventId) {
+                    [aliceRestClient sendTextMessageToRoom:roomId text:@"Hi bob"  success:^(NSString *eventId) {
 
                         aliceTextEventId = eventId;
 
@@ -900,7 +849,7 @@
 - (void)checkPaginateWhenReachingTheExactBeginningOfTheRoom:(MXRoom*)room
 {
     __block NSUInteger eventCount = 0;
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
         [liveTimeline listenToEvents:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
             if (direction == MXTimelineDirectionBackwards)
@@ -955,7 +904,7 @@
 {
     __block NSString *messageEventId;
 
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
         [liveTimeline listenToEvents:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
             if (MXEventTypeRoomMessage == event.eventType)
@@ -997,7 +946,7 @@
         }];
     }];
 
-    [room sendTextMessage:@"This is text message" threadId:nil success:^(NSString *eventId) {
+    [room sendTextMessage:@"This is text message" success:^(NSString *eventId) {
 
         messageEventId = eventId;
 
@@ -1031,7 +980,6 @@
 
             // Let's (and verify) MXSession start update the store with user information
             mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-            [matrixSDKTestsData retain:mxSession];
 
             [mxSession setStore:store success:^{
 
@@ -1103,7 +1051,6 @@
 
             // Let's (and verify) MXSession start update the store with user information
             mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-            [matrixSDKTestsData retain:mxSession];
 
             [mxSession setStore:store success:^{
 
@@ -1183,7 +1130,7 @@
             MXUser *myUser = [store userWithUserId:matrixSDKTestsData.bobCredentials.userId];
 
             XCTAssertNil(myUser);
-            XCTAssertEqual(store.roomSummaryStore.rooms.count, 0);
+            XCTAssertEqual(store.rooms.count, 0);
 
             if ([store respondsToSelector:@selector(close)])
             {
@@ -1192,14 +1139,12 @@
 
             // Do a 1st [mxSession start] to fill the store
             mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-            [matrixSDKTestsData retain:mxSession];
-            
             [mxSession setStore:store success:^{
 
                 [mxSession start:^{
 
                     NSString *eventStreamToken = [store.eventStreamToken copy];
-                    NSUInteger storeRoomsCount = store.roomSummaryStore.rooms.count;
+                    NSUInteger storeRoomsCount = store.rooms.count;
 
                     [mxSession close];
                     mxSession = nil;
@@ -1207,7 +1152,7 @@
                     // Create another random room to create more data server side
                     [bobRestClient createRoom:nil visibility:kMXRoomDirectoryVisibilityPrivate roomAlias:nil topic:nil success:^(MXCreateRoomResponse *response) {
 
-                        [bobRestClient sendTextMessageToRoom:response.roomId threadId:nil text:@"A Message" success:^(NSString *eventId) {
+                        [bobRestClient sendTextMessageToRoom:response.roomId text:@"A Message" success:^(NSString *eventId) {
 
                             // Do a 2nd [mxSession start] with the filled store
                             id<MXStore> store2 = [[mxStoreClass alloc] init];
@@ -1215,13 +1160,12 @@
                             __block BOOL onStoreDataReadyCalled;
 
                             MXSession *mxSession2 = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-                            [matrixSDKTestsData retain:mxSession2];
 
                             [mxSession2 setStore:store2 success:^{
                                 onStoreDataReadyCalled = YES;
 
                                 XCTAssertEqual(mxSession2.rooms.count, storeRoomsCount, @"MXSessionOnStoreDataReady must have loaded as many MXRooms as room stored");
-                                XCTAssertEqual(store2.roomSummaryStore.rooms.count, storeRoomsCount, @"There must still the same number of stored rooms");
+                                XCTAssertEqual(store2.rooms.count, storeRoomsCount, @"There must still the same number of stored rooms");
                                 XCTAssertEqualObjects(eventStreamToken, store2.eventStreamToken, @"The event stream token must not have changed yet");
 
                                 [mxSession2 start:^{
@@ -1229,7 +1173,7 @@
                                     XCTAssert(onStoreDataReadyCalled, @"onStoreDataReady must alway be called before onServerSyncDone");
 
                                     XCTAssertEqual(mxSession2.rooms.count, storeRoomsCount + 1, @"MXSessionOnStoreDataReady must have loaded as many MXRooms as room stored");
-                                    XCTAssertEqual(store2.roomSummaryStore.rooms.count, storeRoomsCount + 1, @"There must still the same number of stored rooms");
+                                    XCTAssertEqual(store2.rooms.count, storeRoomsCount + 1, @"There must still the same number of stored rooms");
                                     XCTAssertNotEqualObjects(eventStreamToken, store2.eventStreamToken, @"The event stream token must not have changed yet");
 
                                     [mxSession2 close];
@@ -1282,8 +1226,6 @@
         id<MXStore> store = [[mxStoreClass alloc] init];
 
         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
         [mxSession setStore:store success:^{
 
             [mxSession start:^{
@@ -1292,7 +1234,7 @@
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
                 [room leave:^{
 
-                    XCTAssertEqual(NSNotFound, [store.roomSummaryStore.rooms indexOfObject:roomId], @"The room %@ must be no more in the store", roomId);
+                    XCTAssertEqual(NSNotFound, [store.rooms indexOfObject:roomId], @"The room %@ must be no more in the store", roomId);
 
                     [mxSession close];
                     mxSession = nil;
@@ -1301,7 +1243,7 @@
                     id<MXStore> store2 = [[mxStoreClass alloc] init];
                     [store2 openWithCredentials:matrixSDKTestsData.bobCredentials onComplete:^{
 
-                        XCTAssertEqual(NSNotFound, [store2.roomSummaryStore.rooms indexOfObject:roomId], @"The room %@ must be no more in the store", roomId);
+                        XCTAssertEqual(NSNotFound, [store2.rooms indexOfObject:roomId], @"The room %@ must be no more in the store", roomId);
 
                         if ([store2 respondsToSelector:@selector(close)])
                         {
@@ -1342,47 +1284,38 @@
         id<MXStore> store = [[mxStoreClass alloc] init];
 
         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
         [mxSession setStore:store success:^{
             [mxSession start:^{
 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
-                
-                [room.mxSession eventWithEventId:room.summary.lastMessage.eventId
-                                          inRoom:room.roomId
-                                         success:^(MXEvent *event) {
-                    
-                    NSUInteger age = event.age;
-                    uint64_t ageLocalTs = event.ageLocalTs;
 
-                    if ([store respondsToSelector:@selector(close)])
-                    {
-                        [store close];
-                    }
+                MXEvent *event = room.summary.lastMessageEvent;
 
-                    [store openWithCredentials:matrixSDKTestsData.bobCredentials onComplete:^{
+                NSUInteger age = event.age;
+                uint64_t ageLocalTs = event.ageLocalTs;
 
-                        MXEvent *sameEvent = [store eventWithEventId:event.eventId inRoom:roomId];
-                        XCTAssertNotNil(sameEvent);
+                if ([store respondsToSelector:@selector(close)])
+                {
+                    [store close];
+                }
 
-                        NSUInteger sameEventAge = sameEvent.age;
-                        uint64_t sameEventAgeLocalTs = sameEvent.ageLocalTs;
+                [store openWithCredentials:matrixSDKTestsData.bobCredentials onComplete:^{
 
-                        XCTAssertGreaterThan(sameEventAge, 0, @"MXEvent.age should strictly positive");
-                        XCTAssertLessThanOrEqual(age, sameEventAge, @"MXEvent.age should auto increase");
-                        XCTAssertLessThanOrEqual(sameEventAge - age, 1000, @"sameEventAge and age should be almost the same");
+                    MXEvent *sameEvent = [store eventWithEventId:event.eventId inRoom:roomId];
+                    XCTAssertNotNil(sameEvent);
 
-                        XCTAssertEqual(ageLocalTs, sameEventAgeLocalTs, @"MXEvent.ageLocalTs must still be the same");
+                    NSUInteger sameEventAge = sameEvent.age;
+                    uint64_t sameEventAgeLocalTs = sameEvent.ageLocalTs;
 
-                        [expectation fulfill];
-                    } failure:^(NSError *error) {
-                        XCTFail(@"Cannot set up intial test conditions - error: %@", error);
-                        [expectation fulfill];
-                    }];
-                    
+                    XCTAssertGreaterThan(sameEventAge, 0, @"MXEvent.age should strictly positive");
+                    XCTAssertLessThanOrEqual(age, sameEventAge, @"MXEvent.age should auto increase");
+                    XCTAssertLessThanOrEqual(sameEventAge - age, 1000, @"sameEventAge and age should be almost the same");
+
+                    XCTAssertEqual(ageLocalTs, sameEventAgeLocalTs, @"MXEvent.ageLocalTs must still be the same");
+
+                    [expectation fulfill];
                 } failure:^(NSError *error) {
-                    XCTFail(@"The request should not fail - NSError: %@", error);
+                    XCTFail(@"Cannot set up intial test conditions - error: %@", error);
                     [expectation fulfill];
                 }];
 
@@ -1409,14 +1342,12 @@
 
         // Do a 1st [mxSession start] to fill the store
         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
         [mxSession setStore:store success:^{
             [mxSession startWithSyncFilter:[MXFilterJSONModel syncFilterWithMessageLimit:5] onServerSyncDone:^{
 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
 
-                [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                [room liveTimeline:^(MXEventTimeline *liveTimeline) {
                     [liveTimeline resetPagination];
                     [liveTimeline paginate:10 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
 
@@ -1430,7 +1361,6 @@
                         id<MXStore> store2 = [[mxStoreClass alloc] init];
 
                         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-                        [matrixSDKTestsData retain:mxSession];
                         [mxSession setStore:store2 success:^{
 
                             XCTAssertEqualObjects(roomPaginationToken, [store2 paginationTokenOfRoom:roomId], @"The store must keep the pagination token");
@@ -1475,8 +1405,6 @@
         id<MXStore> bobStore1 = [[mxStoreClass alloc] init];
 
         mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
         [mxSession setStore:bobStore1 success:^{
             [mxSession start:^{
 
@@ -1494,7 +1422,7 @@
                         id<MXStore> bobStore3 = [[mxStoreClass alloc] init];
                         [bobStore3 openWithCredentials:matrixSDKTestsData.bobCredentials onComplete:^{
 
-                            XCTAssertEqual(bobStore2.roomSummaryStore.rooms.count, bobStore3.roomSummaryStore.rooms.count);
+                            XCTAssertEqual(bobStore2.rooms.count, bobStore3.rooms.count);
 
                             if ([bobStore2 isKindOfClass:[MXFileStore class]])
                             {
@@ -1568,8 +1496,6 @@
 
                                     // Do a 1st [mxSession start] to fill the store
                                     mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-                                    [matrixSDKTestsData retain:mxSession];
-                                    
                                     [mxSession setStore:store success:^{
                                         [mxSession start:^{
 
@@ -1580,8 +1506,6 @@
                                             id<MXStore> store2 = [[mxStoreClass alloc] init];
 
                                             mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-                                            [matrixSDKTestsData retain:mxSession];
-                                            
                                             [mxSession setStore:store2 success:^{
 
                                                 NSArray<MXRoom*> *roomsWithTagTag1 = [mxSession roomsWithTag:tag1];
@@ -1670,8 +1594,6 @@
 
                 // Do a 1st [mxSession start] to fill the store
                 mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-                [matrixSDKTestsData retain:mxSession];
-                
                 [mxSession setStore:store success:^{
                     [mxSession start:^{
 
@@ -1682,7 +1604,8 @@
                         id<MXStore> store2 = [[mxStoreClass alloc] init];
 
                         [store2 openWithCredentials:bobRestClient.credentials onComplete:^{
-                            id<MXRoomSummaryProtocol> summary = [store2.roomSummaryStore summaryOfRoom:response.roomId];
+
+                            MXRoomSummary *summary = [store2 summaryOfRoom:response.roomId];
 
                             XCTAssert(summary);
 

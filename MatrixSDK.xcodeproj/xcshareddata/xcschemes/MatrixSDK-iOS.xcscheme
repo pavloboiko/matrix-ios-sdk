@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1340"
+   LastUpgradeVersion = "0940"
    version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -29,7 +29,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "32C6F93719DD814400EA4E9C"
-               BuildableName = "MatrixSDKTests.xctest"
+               BuildableName = "MatrixSDKTests-iOS.xctest"
                BlueprintName = "MatrixSDKTests-iOS"
                ReferencedContainer = "container:MatrixSDK.xcodeproj">
             </BuildableReference>
@@ -40,8 +40,20 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES"
-      codeCoverageEnabled = "YES">
+      codeCoverageEnabled = "YES"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "32C6F93719DD814400EA4E9C"
+               BuildableName = "MatrixSDKTests-iOS.xctest"
+               BlueprintName = "MatrixSDKTests-iOS"
+               ReferencedContainer = "container:MatrixSDK.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
@@ -51,18 +63,8 @@
             ReferencedContainer = "container:MatrixSDK.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
-      <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "32C6F93719DD814400EA4E9C"
-               BuildableName = "MatrixSDKTests.xctest"
-               BlueprintName = "MatrixSDKTests-iOS"
-               ReferencedContainer = "container:MatrixSDK.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-      </Testables>
+      <AdditionalOptions>
+      </AdditionalOptions>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -83,6 +85,8 @@
             ReferencedContainer = "container:MatrixSDK.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
+      <AdditionalOptions>
+      </AdditionalOptions>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

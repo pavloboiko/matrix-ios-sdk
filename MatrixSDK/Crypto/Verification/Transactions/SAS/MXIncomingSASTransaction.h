@@ -22,7 +22,12 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  An handler on an incoming SAS device verification.
  */
-@interface MXIncomingSASTransaction : MXLegacySASTransaction
+@interface MXIncomingSASTransaction : MXSASTransaction
+
+/**
+ Accept the device verification request.
+ */
+- (void)accept;
 
 @end
 

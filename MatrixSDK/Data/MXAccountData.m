@@ -1,6 +1,5 @@
 /*
  Copyright 2016 OpenMarket Ltd
- Copyright 2020 The Matrix.org Foundation C.I.C
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,11 +15,6 @@
  */
 
 #import "MXAccountData.h"
-
-#import "MXJSONModel.h"
-#import "MXRestClient.h"
-
-#warning File has not been annotated with nullability, see MX_ASSUME_MISSING_NULLABILITY_BEGIN
 
 @interface MXAccountData ()
 {
@@ -43,45 +37,14 @@
     return self;
 }
 
-- (instancetype)initWithAccountData:(NSDictionary<NSString *,id> *)accountData
-{
-    self = [self init];
-    if (self)
-    {
-        NSArray<NSDictionary<NSString *, id> *> *events;
-        MXJSONModelSetArray(events, accountData[@"events"]);
-        
-        for (NSDictionary<NSString *, id> *event in events)
-        {
-            [self updateWithEvent:event];
-        }
-    }
-    return self;
-}
-
 - (void)updateWithEvent:(NSDictionary<NSString *, id> *)event
 {
-    [self updateDataWithType:event[@"type"] data:event[@"content"]];
-}
-
-- (void)updateDataWithType:(NSString *)type data:(NSDictionary *)data
-{
-    accountDataDict[type] = data;
-}
-
-- (void)deleteDataWithType:(NSString *)type
-{
-    [accountDataDict removeObjectForKey:type];
+    accountDataDict[event[@"type"]] = event[@"content"];
 }
 
 - (NSDictionary *)accountDataForEventType:(NSString*)eventType
 {
     return accountDataDict[eventType];
-}
-
-- (NSDictionary<NSString *,id> *)allAccountDataEvents
-{
-    return accountDataDict.copy;
 }
 
 - (NSDictionary<NSString *, id> *)accountData
@@ -96,25 +59,6 @@
                             }];
     }
     return @{@"events": events};
-}
-
-+ (NSString *)localNotificationSettingsKeyForDeviceWithId:(NSString*)deviceId
-{
-    return [kMXAccountDataLocalNotificationKeyPrefix stringByAppendingString:deviceId];
-}
-
-- (NSDictionary <NSString *, id>*)localNotificationSettingsForDeviceWithId:(NSString*)deviceId
-{
-    if (!deviceId)
-    {
-        return nil;
-    }
-    
-    
-    NSString *deviceNotificationKey = [MXAccountData localNotificationSettingsKeyForDeviceWithId:deviceId];
-    NSDictionary <NSString *, id>*deviceNotificationSettings;
-    MXJSONModelSetDictionary(deviceNotificationSettings, accountDataDict[deviceNotificationKey]);
-    return deviceNotificationSettings;
 }
 
 @end

@@ -48,8 +48,6 @@
 - (void)tearDown
 {
     matrixSDKTestsData = nil;
-    
-    [super tearDown];
 }
 
 // Create a room with an event with a reaction on it
@@ -58,7 +56,7 @@
     [matrixSDKTestsData doTestWithAliceAndBobInARoom:self aliceStore:[[MXMemoryStore alloc] init] bobStore:[[MXMemoryStore alloc] init] readyToTest:^(MXSession *mxSession, MXSession *otherSession, NSString *roomId, XCTestExpectation *expectation) {
 
         MXRoom *room = [mxSession roomWithRoomId:roomId];
-        [room sendTextMessage:@"Hello" threadId:nil success:^(NSString *eventId) {
+        [room sendTextMessage:@"Hello" success:^(NSString *eventId) {
 
             [mxSession.aggregations addReaction:@"👍" forEvent:eventId inRoom:room.roomId success:^() {
 
@@ -88,12 +86,12 @@
 
         // - Add enough messages while the session in background to trigger a gappy sync
         [mxSession pause];
-        [matrixSDKTestsData for:mxSession.matrixRestClient andRoom:room.roomId sendMessages:10 testCase:self success:^{
+        [matrixSDKTestsData for:mxSession.matrixRestClient andRoom:room.roomId sendMessages:10 success:^{
 
             // - Add a reaction in the gap
             [otherSession.aggregations addReaction:@"🙂" forEvent:eventId inRoom:room.roomId success:^() {
 
-                [matrixSDKTestsData for:mxSession.matrixRestClient andRoom:room.roomId sendMessages:20 testCase:self success:^{
+                [matrixSDKTestsData for:mxSession.matrixRestClient andRoom:room.roomId sendMessages:20 success:^{
 
                     [mxSession start:^{
                         readyToTest(mxSession, room, otherSession, expectation, eventId);
@@ -128,7 +126,6 @@
 
         // - Do an initial sync
         MXSession *mxSession2 = [[MXSession alloc] initWithMatrixRestClient:restClient];
-        [matrixSDKTestsData retain:mxSession2];
         [mxSession2 setStore:[[MXMemoryStore alloc] init] success:^{
 
             [mxSession2 start:^{
@@ -154,7 +151,7 @@
     [matrixSDKTestsData doMXSessionTestWithBobAndARoom:self andStore:[[MXMemoryStore alloc] init] readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
 
         // - Send a message
-        [room sendTextMessage:@"Hello" threadId:nil success:^(NSString *eventId) {
+        [room sendTextMessage:@"Hello" success:^(NSString *eventId) {
 
             // - React on it
             [mxSession.aggregations addReaction:@"👍" forEvent:eventId inRoom:room.roomId success:^() {
@@ -196,7 +193,7 @@
 
             MXEventAnnotationChunk *annotations = event.unsignedData.relations.annotation;
             XCTAssertNotNil(annotations);
-            // XCTAssertEqual(annotations.count, 1); // Not implemented on the backend - https://github.com/matrix-org/synapse/issues/10557
+            XCTAssertEqual(annotations.count, 1);        // TODO: Ping Synapse team about that
             XCTAssertEqual(annotations.chunk.count, 1);
 
             MXEventAnnotation *annotation = annotations.chunk.firstObject;
@@ -230,7 +227,6 @@
 
         // - Do an initial sync
         mxSession = [[MXSession alloc] initWithMatrixRestClient:restClient];
-        [matrixSDKTestsData retain:mxSession];
         [mxSession setStore:[[MXMemoryStore alloc] init] success:^{
 
             [mxSession start:^{
@@ -381,7 +377,6 @@
 
         // - Do an initial sync
         mxSession = [[MXSession alloc] initWithMatrixRestClient:restClient];
-        [matrixSDKTestsData retain:mxSession];
         [mxSession setStore:[[MXMemoryStore alloc] init] success:^{
 
             [mxSession start:^{
@@ -484,7 +479,7 @@
     [matrixSDKTestsData doMXSessionTestWithBobAndARoom:self andStore:[[MXMemoryStore alloc] init] readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
 
         // - Send a message
-        [room sendTextMessage:@"Hello" threadId:nil success:^(NSString *eventId) {
+        [room sendTextMessage:@"Hello" success:^(NSString *eventId) {
 
             // - React on it
             [mxSession.aggregations addReaction:@"👍" forEvent:eventId inRoom:room.roomId success:^() {
@@ -651,13 +646,12 @@
         XCTAssertEqual(reactionCount.count, 1);
         if ([reactionCount.reaction isEqualToString: @"👍"])
         {
-            // TODO: Not implemented yet - https://github.com/vector-im/riot-ios/issues/2452
-            // XCTAssertTrue(reactionCount.myUserHasReacted, @"We must know reaction made by our user");
+            // TODO: https://github.com/vector-im/riot-ios/issues/2452
+            XCTAssertTrue(reactionCount.myUserHasReacted, @"We must know reaction made by our user");
         }
         else if ([reactionCount.reaction isEqualToString: @"🙂"])
         {
-            // TODO: Not implemented yet - https://github.com/vector-im/riot-ios/issues/2452
-            // XCTAssertFalse(reactionCount.myUserHasReacted);
+            XCTAssertFalse(reactionCount.myUserHasReacted);
         }
         else
         {
@@ -670,7 +664,7 @@
 // Check we get valid reaction (from the HS) when paginating
 - (void)checkReactionsWhenPaginating:(MXSession*)mxSession room:(MXRoom*)room event:(NSString*)eventId expectation:(XCTestExpectation*)expectation
 {
-    [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+    [room liveTimeline:^(MXEventTimeline *liveTimeline) {
         [liveTimeline resetPagination];
         [liveTimeline paginate:100 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
 
@@ -715,7 +709,7 @@
 // Check we get valid reaction (from the HS) when paginating
 - (void)checkReactionsOnPermalink:(MXSession*)mxSession room:(MXRoom*)room event:(NSString*)eventId expectation:(XCTestExpectation*)expectation
 {
-    id<MXEventTimeline> timeline = [room timelineOnEvent:eventId];
+    MXEventTimeline *timeline = [room timelineOnEvent:eventId];
     [timeline resetPaginationAroundInitialEventWithLimit:0 success:^{
 
         // Random usage to keep a strong reference on timeline

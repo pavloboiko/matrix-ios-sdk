@@ -37,13 +37,11 @@
 #import "MXAggregations.h"
 #import "MXIdentityService.h"
 #import "MX3PidAddManager.h"
-#import "MXMembershipTransitionState.h"
-#import "MXRoomAccountDataUpdating.h"
 
 /**
  `MXSessionState` represents the states in the life cycle of a MXSession instance.
  */
-typedef NS_ENUM(NSUInteger, MXSessionState)
+typedef enum : NSUInteger
 {
     /**
      The session is closed (or not initialized yet).
@@ -59,11 +57,6 @@ typedef NS_ENUM(NSUInteger, MXSessionState)
      Data from the MXStore has been loaded.
      */
     MXSessionStateStoreDataReady,
-    
-    /**
-     Background sync cache is being processed. More local data will come.
-     */
-    MXSessionStateProcessingBackgroundSyncCache,
 
     /**
      The session is syncing with the server.
@@ -123,11 +116,28 @@ typedef NS_ENUM(NSUInteger, MXSessionState)
      @discussion
      The Matrix session will stay in this state until a new call of [MXSession start:failure:].
      */
-    MXSessionStateInitialSyncFailed
+    MXSessionStateInitialSyncFailed,
 
-};
+    /**
+     The access token is no more valid.
 
-@protocol MXRoomListDataManager;
+     @discussion
+     This can happen when the user made a forget password request for example.
+     The Matrix session is no more usable. The user must log in again.
+     */
+    MXSessionStateUnknownToken,
+
+    /**
+     The user is logged out (invalid token) but they still have their local storage.
+     The user should log back in to rehydrate the client.
+
+     @discussion
+     This happens when the homeserver admin has signed the user out.
+     */
+    MXSessionStateSoftLogout
+
+} MXSessionState;
+
 
 #pragma mark - Notifications
 /**
@@ -204,13 +214,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionIgnoredUsersDidChangeNotification;
 FOUNDATION_EXPORT NSString *const kMXSessionDirectRoomsDidChangeNotification;
 
 /**
- Posted when the virtual rooms are updated, either from the store or from the homeserver.
- 
- The notification object is the concerned session (MXSession instance).
- */
-FOUNDATION_EXPORT NSString *const kMXSessionVirtualRoomsDidChangeNotification;
-
-/**
  Posted when the matrix account data are updated from homeserver.
  
  The notification object is the concerned session (MXSession instance).
@@ -223,8 +226,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionAccountDataDidChangeNotification;
  The notification object is the concerned session (MXSession instance).
  */
 FOUNDATION_EXPORT NSString *const kMXSessionAccountDataDidChangeIdentityServerNotification;
-
-FOUNDATION_EXPORT NSString *const kMXSessionAccountDataDidChangeBreadcrumbsNotification;
 
 /**
  Posted when MXSession data have been corrupted. The listener must reload the session data with a full server sync.
@@ -346,13 +347,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionNotificationUserIdsArrayKey;
  */
 FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
 
-@class MXSpaceService;
-@class MXHomeserverCapabilitiesService;
-@class MXThreadingService;
-@class MXCapabilities;
-@class MXEventStreamService;
-@class MXLocationService;
-@class MXSessionSyncProgress;
 
 #pragma mark - MXSession
 /**
@@ -395,11 +389,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
 @property (nonatomic, readonly) MXMediaManager *mediaManager;
 
 /**
- The maximum size an upload can be in bytes.
- */
-@property (nonatomic, readonly) NSInteger maxUploadSize;
-
-/**
  The current state of the session.
  */
 @property (nonatomic, readonly) MXSessionState state;
@@ -435,11 +424,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
 @property (nonatomic, readonly) BOOL syncWithLazyLoadOfRoomMembers;
 
 /**
- Handler that can compute the overal progress of sync and report it to a delegate
- */
-@property (nonatomic, readonly) MXSessionSyncProgress *syncProgress;
-
-/**
  The profile of the current user.
  It is available only after the `onStoreDataReady` callback of `start` is called.
  */
@@ -456,11 +440,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
 @property (nonatomic, readonly) id<MXStore> store;
 
 /**
- The room list data manager.
- */
-@property (nonatomic, readonly) id<MXRoomListDataManager> roomListDataManager;
-
-/**
  The module that manages push notifications.
  */
 @property (nonatomic, readonly) MXNotificationCenter *notificationCenter;
@@ -475,7 +454,7 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
  The module that manages E2E encryption.
  Nil if the feature is not enabled ('cryptoEnabled' property).
  */
-@property (nonatomic, readonly) id<MXCrypto> crypto;
+@property (nonatomic, readonly) MXCrypto *crypto;
 
 /**
  Antivirus scanner used to scan medias.
@@ -487,51 +466,6 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
  The module that manages aggregations (reactions, edition, ...).
  */
 @property (nonatomic, readonly) MXAggregations *aggregations;
-
-/**
- The module that manages spaces.
- */
-@property (nonatomic, readonly) MXSpaceService *spaceService;
-
-/**
- Capabilities of the current homeserver
- */
-@property (nonatomic, readonly) MXHomeserverCapabilitiesService *homeserverCapabilitiesService;
-
-/**
- The module that manages threads.
- */
-@property (nonatomic, readonly) MXThreadingService *threadingService NS_REFINED_FOR_SWIFT;
-
-/**
- Service  used to monitor live events of the session.
- */
-@property (nonatomic, readonly) MXEventStreamService *eventStreamService;
-
-/**
- The module that manages location sharing.
- */
-@property (nonatomic, readonly) MXLocationService *locationService;
-
-/**
- Flag indicating the session can be paused.
- */
-@property (nonatomic, readonly, getter=isPauseable) BOOL pauseable;
-
-/**
- Flag indicating the session can resume from its current state.
- */
-@property (nonatomic, readonly, getter=isResumable) BOOL resumable;
-
-/**
- Whether the user is part of a room with the membership state of `join` or
- they are in the process of joining.
-
- @param roomIdOrAlias The ID or alias of the room to check.
-
- @return YES if they are.
- */
-- (BOOL)isJoinedOnRoom:(NSString *)roomIdOrAlias;
 
 #pragma mark - Class methods
 
@@ -591,8 +525,8 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
  Pause the session events stream.
  This action may be delayed by using `retainPreventPause`.
  
- Caution: this action is ignored if the session is not pauseable.
- @see pauseable.
+ Caution: this action is ignored if the session state is not MXSessionStateRunning
+ or MXSessionStateBackgroundSyncInProgress.
  
  No more live events will be received by the listeners.
  */
@@ -609,17 +543,11 @@ FOUNDATION_EXPORT NSString *const kMXSessionNoRoomTag;
  */
 - (void)resume:(void (^)(void))resumeDone;
 
-/**
-Update client information without waiting for sync to happen.
- */
-- (void)updateClientInformation;
-
 typedef void (^MXOnBackgroundSyncDone)(void);
 typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 
 /**
- Perform an events stream catchup in background (by keeping user offline). Considers session state.
- @see -[MXSession backgroundSync:ignoreSessionState:success:failure]
+ Perform an events stream catchup in background (by keeping user offline).
  
  @param timeout the max time in milliseconds to perform the catchup
  @param backgroundSyncDone A block called when the SDK has been successfully performed a catchup
@@ -628,26 +556,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 - (void)backgroundSync:(unsigned int)timeout
                success:(MXOnBackgroundSyncDone)backgroundSyncDone
                failure:(MXOnBackgroundSyncFail)backgroundSyncfails NS_REFINED_FOR_SWIFT;
-
-/**
- Perform an events stream catchup in background (by keeping user offline).
- 
- @param timeout the max time in milliseconds to perform the catchup in client side
- @param ignoreSessionState ignore session state to be equal to paused
- @param backgroundSyncDone A block called when the SDK has been successfully performed a catchup
- @param backgroundSyncfails A block called when the catchup fails.
- */
-- (void)backgroundSync:(unsigned int)timeout
-    ignoreSessionState:(BOOL)ignoreSessionState
-               success:(MXOnBackgroundSyncDone)backgroundSyncDone
-               failure:(MXOnBackgroundSyncFail)backgroundSyncfails NS_REFINED_FOR_SWIFT;
-
-/**
- Handles sync response retrieved by the background sync service, if the cache is valid. Clears the cache after processing.
- 
- @param completion Completion block called when the session has been processed the cache, or when no valid cache exists.
- */
-- (void)handleBackgroundSyncCacheIfRequiredWithCompletion:(void (^)(void))completion;
 
 /**
  Restart the session events stream.
@@ -743,11 +651,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
          failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
 
 /**
- Sets a room list data manager. Can be only configured once per active session.
- */
-- (void)setRoomListDataManager:(id<MXRoomListDataManager>)roomListDataManager;
-
-/**
  Set a new identity server.
 
  The method updates underlaying services.
@@ -798,7 +701,7 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 
  @return a MXHTTPOperation instance.
  */
-- (MXHTTPOperation*)supportedMatrixVersions:(void (^)(MXMatrixVersions *matrixVersions))success failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
+- (MXHTTPOperation*)supportedMatrixVersions:(void (^)(MXMatrixVersions *matrixVersions))success failure:(void (^)(NSError *error))failure;
 
 /**
  The antivirus server URL (nil by default).
@@ -926,6 +829,7 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
                                                     success:(void (^)(BOOL canEnableE2E))success
                                                     failure:(void (^)(NSError *error))failure;
 
+
 #pragma mark - The user's rooms
 /**
  Check if the user is in a room
@@ -944,16 +848,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  @return the MXRoom instance.
  */
 - (MXRoom *)roomWithRoomId:(NSString*)roomId;
-
-/**
- Get the MXRoom instance of a room.
- Create it if does not exist yet. The room will be created locally if needed, won't have any effect on the home server. Posts `kMXSessionNewRoomNotification`.
- 
- @param roomId The id to the user.
- 
- @return the MXRoom instance.
- */
-- (MXRoom *)getOrCreateRoom:(NSString*)roomId;
 
 /**
  Get the MXRoom instance of the room that owns the passed room alias.
@@ -978,7 +872,7 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  
  A dictionary where the keys are the user IDs and values are lists of room ID strings.
  */
-@property (atomic, copy, readonly) NSDictionary<NSString*, NSArray<NSString*>*> *directRooms;
+@property (nonatomic, readonly) NSDictionary<NSString*, NSArray<NSString*>*> *directRooms;
 
 /**
  Return the first joined direct chat listed in account data for this user.
@@ -986,14 +880,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  @return the MXRoom instance (nil if no room exists yet).
  */
 - (MXRoom *)directJoinedRoomWithUserId:(NSString*)userId;
-
-/**
- Return the first joined direct chat listed in account data for this user,
- or it will create one if no room exists yet.
- */
-- (MXHTTPOperation *)getOrCreateDirectJoinedRoomWithUserId:(NSString*)userId
-                                                   success:(void (^)(MXRoom *))success
-                                                   failure:(void (^)(NSError *error))failure;
 
 /**
  Get the direct user id of a room.
@@ -1059,7 +945,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 #pragma mark - Matrix Events
 /**
  Retrieve an event from its event id.
- It will be decrypted if needed.
 
  @param eventId the id of the event to retrieve.
  @param roomId (optional) the id of the room.
@@ -1072,7 +957,7 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 - (MXHTTPOperation*)eventWithEventId:(NSString*)eventId
                               inRoom:(NSString *)roomId
                              success:(void (^)(MXEvent *event))success
-                             failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
+                             failure:(void (^)(NSError *error))failure;
 
 
 #pragma mark - Rooms summaries
@@ -1084,6 +969,13 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  @return the MXRoomSummary instance.
  */
 - (MXRoomSummary *)roomSummaryWithRoomId:(NSString*)roomId;
+
+/**
+ Get the list of all rooms summaries.
+
+ @return an array of MXRoomSummary.
+ */
+- (NSArray<MXRoomSummary*>*)roomsSummaries;
 
 /**
  Recompute all room summaries last message.
@@ -1098,37 +990,14 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  
  This may lead to pagination requests to the homeserver. Updated room summaries will be 
  notified by `kMXRoomSummaryDidChangeNotification`.
- 
- Calling this method will paginate a maximum of 50 messages from the homeserver.
- Use `fixRoomsSummariesLastMessageWithMaxServerPaginationCount:` to customize this value.
  */
 - (void)fixRoomsSummariesLastMessage;
 
 /**
- Make sure that all room summaries have a last message.
- 
- This may lead to pagination requests to the homeserver. Updated room summaries will be
- notified by `kMXRoomSummaryDidChangeNotification`.
- 
- @param maxServerPaginationCount the maximal number of messages to paginate from the homeserver.
- */
-- (void)fixRoomsSummariesLastMessageWithMaxServerPaginationCount:(NSUInteger)maxServerPaginationCount;
-
-/**
  Delegate for updating room summaries.
  By default, it is the one returned by [MXRoomSummaryUpdater roomSummaryUpdaterForSession:].
- 
- This property is strong as the only other reference to the delegate is a weak ref in the updaterPerSession table.
  */
 @property id<MXRoomSummaryUpdating> roomSummaryUpdateDelegate;
-
-/**
- Delegate for updating room account data.
- By default, it is the one returned by [MXRoomAccountDataUpdater roomAccountDataUpdaterForSession:].
- 
- This property is strong as the only other reference to the delegate is a weak ref in the updaterPerSession table.
- */
-@property id<MXRoomAccountDataUpdating> roomAccountDataUpdateDelegate;
 
 #pragma mark - The user's groups
 /**
@@ -1458,20 +1327,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
                            failure:(void (^)(NSError *error))failure;
 
 /**
- Delete an account_data event for the client.
- 
- @param type The event type of the account_data to delete (@see kMXAccountDataType* strings)
- Custom types should be namespaced to avoid clashes.
- @param success A block object called when the operation succeeds.
- @param failure A block object called when the operation fails.
- 
- @return a MXHTTPOperation instance.
- */
-- (MXHTTPOperation*)deleteAccountDataWithType:(NSString*)type
-                                      success:(void (^)(void))success
-                                      failure:(void (^)(NSError *error))failure;
-
-/**
  Set the identity server in the user's account data.
 
  `kMXSessionAccountDataDidChangeIdentityServerNotification` will be sent once the
@@ -1504,22 +1359,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  */
 - (NSString*)accountDataIdentityServer;
 
-/**
- Prepares `identityService` ready to accept its service terms:
- - If it is missing, a new one will be created, first checking the user's account data, falling back on the supplied default.
- - Registers a new accessToken if necessary so the server is ready to use.
- 
- @param defaultIdentityServerUrlString The identity server URL to fallback to when the user's account data has no value
- @param success The block called when the operation completes. The provides the `MXSession`, identity server's URL and it's access token.
- @param failure The block called the the operation fails. This provides the error that occurred.
- */
-- (void)prepareIdentityServiceForTermsWithDefault:(NSString *)defaultIdentityServerUrlString
-                                          success:(void (^)(MXSession *session, NSString *baseURL, NSString *accessToken))success
-                                          failure:(void (^)(NSError *error))failure;
-
-- (void)updateBreadcrumbsWithRoomWithId:(NSString *)roomId
-                                success:(void (^)(void))success
-                                failure:(void (^)(NSError *error))failure;
 
 #pragma mark - Homeserver information
 
@@ -1539,12 +1378,6 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 - (MXHTTPOperation*)refreshHomeserverWellknown:(void (^)(MXWellKnown *homeserverWellknown))success
                                        failure:(void (^)(NSError *error))failure;
 
-#pragma mark - Homeserver capabilities
-
-/**
- The homeserver capabilities.
- */
-@property (nonatomic, readonly) MXCapabilities *homeserverCapabilities NS_REFINED_FOR_SWIFT;
 
 #pragma mark - Matrix filters
 /**
@@ -1579,18 +1412,15 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
 
 
 #pragma mark - Crypto
-
 /**
- Decrypt events asynchronously and update their data.
- 
- @param events the events to decrypt.
- @param timeline the id of the timeline where the events are decrypted. It is used
+ Decrypt an event and update its data.
+
+ @param event the event to decrypt.
+ @param timeline the id of the timeline where the event is decrypted. It is used
         to prevent replay attack.
- @param onComplete the block called when the operations completes. It returns events that failed to decrypt.
+ @return YES if decryption is successful.
  */
-- (void)decryptEvents:(NSArray<MXEvent*> *)events
-           inTimeline:(NSString*)timeline
-           onComplete:(void (^)(NSArray<MXEvent*> *failedEvents))onComplete;
+- (BOOL)decryptEvent:(MXEvent*)event inTimeline:(NSString*)timeline;
 
 /**
  Reset replay attack data for the given timeline.
@@ -1651,32 +1481,5 @@ typedef void (^MXOnBackgroundSyncFail)(NSError *error);
  @return the current publicised groups for the provided user.
  */
 - (NSArray<NSString *> *)publicisedGroupsForUser:(NSString*)userId;
-
-#pragma mark - Virtual Rooms
-
-/**
- Cache the virtual room of a native room.
- 
- @param virtualRoomId nirtual room identifier
- @param nativeRoomId native room identifier.
- */
-- (void)setVirtualRoom:(NSString *)virtualRoomId
-         forNativeRoom:(NSString *)nativeRoomId;
-
-/**
- Get virtual room identifier for a given native room identifier.
- 
- @param nativeRoomId native room identifier to look for the virtual room.
- @return the virtual room identifier for the given native room. May be nil.
- */
-- (NSString *)virtualRoomOf:(NSString *)nativeRoomId;
-
-#pragma mark - Presence
-
-/**
- Preferred presence status for this session. Session will provide this value on syncs
- while the application is in foreground. Defaults to MXPresenceOnline.
- */
-@property (nonatomic) MXPresence preferredSyncPresence;
 
 @end

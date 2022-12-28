@@ -1,7 +1,6 @@
 /*
  Copyright 2015 OpenMarket Ltd
  Copyright 2017 Vector Creations Ltd
- Copyright 2020 The Matrix.org Foundation C.I.C
  
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -17,22 +16,7 @@
  */
 
 #import <Foundation/Foundation.h>
-#import <AVFoundation/AVFoundation.h>
-
 #import "MXAnalyticsDelegate.h"
-#import "MXProfiler.h"
-
-/**
- Call transfer types. `MXCallTransferTypeLocal` is created for future, not used right now.
- */
-typedef NS_ENUM(NSUInteger, MXCallTransferType)
-{
-    //  Bridged call transfer type
-    MXCallTransferTypeBridged,
-
-    //  Local call transfer type
-    MXCallTransferTypeLocal
-};
 
 
 #pragma mark - Build time options
@@ -73,23 +57,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL enableCryptoWhenStartingMXSession;
 
 /**
- Automatically enable key backup when initializing a new MXCrypto.
- YES by default.
- */
-@property (nonatomic) BOOL enableKeyBackupWhenStartingMXCrypto;
-
-/**
  Compute and maintain MXRommSummary.trust value.
  NO by default.
  This requires to load all room members to compute it.
  */
 @property (nonatomic) BOOL computeE2ERoomSummaryTrust;
-
-/**
- Handle `m.call.asserted_identity` events for the calls.
- NO by default.
- */
-@property (nonatomic) BOOL handleCallAssertedIdentityEvents;
 
 /**
  The delegate object to receive analytics events
@@ -99,26 +71,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, nullable) id<MXAnalyticsDelegate> analyticsDelegate;
 
 /**
- The profiler.
- 
- By default, MXBaseProfiler.
- */
-@property (nonatomic, nullable) id<MXProfiler> profiler;
-
-/**
  The version of the media cache at the application level.
  By updating this value the application is able to clear the existing media cache.
  
  The default version value is 0.
  */
 @property (nonatomic) NSUInteger mediaCacheAppVersion;
-
-/**
- The preset name given to AVAssetExportSession when converting a video.
- 
- The default value is AVAssetExportPreset1920x1080.
- */
-@property (nonatomic) NSString *videoConversionPresetName;
 
 /**
  Object that handle enabling background mode
@@ -132,111 +90,6 @@ NS_ASSUME_NONNULL_BEGIN
  nil by default.
 */
 @property (nonatomic, nullable) NSString *applicationGroupIdentifier;
-
-/**
- @brief Specifies additional headers which will be set on outgoing requests.
- Note that these headers are added to the request only if not already present.
- Following headers should not be modified:
- - Authorization
- - Connection
- - Host
- - Proxy-Authenticate
- - Proxy-Authorization
- - WWW-Authenticate
- 
- @remark Empty dictionary by default.
-*/
-@property (nonatomic, nullable) NSDictionary<NSString *, NSString*> *HTTPAdditionalHeaders;
-
-/**
- Flag to automatically accept room invites.
- 
- @remark NO by default.
- */
-@property (nonatomic, assign) BOOL autoAcceptRoomInvites;
-
-/**
- Custom domain to use to fetch the matrix client wellknown.
- 
- It is nil by default. By default, MXSession uses the domain of the user id.
- */
-@property (nonatomic, nullable) NSString *wellknownDomainUrl;
-
-/**
- Call transfer type to be used when transferring calls.
- 
- @remark `MXCallTransferTypeBridged` by default.
- */
-@property (nonatomic, assign) MXCallTransferType callTransferType;
-
-/**
- The class of room list data manager. This class must conform to MXRoomListDataManager protocol.
- By default this class is MXCoreDataRoomListDataManager.
- */
-@property (nonatomic) Class roomListDataManagerClass;
-
-/**
- For use in clients that use a custom base url for permalinks rather than matrix.to.
- This baseURL is used to generate permalinks within the app (E.g. timeline message permalinks).
- An Optional String, when nil matrix.to format/hostname is used instead.
- */
-@property (nonatomic, nullable) NSString *clientPermalinkBaseUrl;
-
-/**
- Use refresh tokens and expiring access tokens as the auth mechanism as opposed to long-lived access tokens.
- 
- @remark NO by default.
- */
-@property (nonatomic, assign) BOOL authEnableRefreshTokens;
-
-/**
- Enable threading module and thread-specific replies to events.
-
- @remark NO by default.
- */
-@property (nonatomic) BOOL enableThreads;
-
-/**
- Enable sharing of session keys for an immediate historical context (e.g. last 10-20 messages)
- when inviting a new user to a room with shared history.
- 
- @remark NO by default.
- */
-@property (nonatomic) BOOL enableRoomSharedHistoryOnInvite;
-
-#if DEBUG
-
-/**
- Enable Crypto module V2, a work-in-progress and NOT production-ready implementation
- of [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk/tree/main/crates/matrix-sdk-crypto).
- 
- @remark NO by default.
- */
-@property (nonatomic) BOOL enableCryptoV2;
-
-#endif
-
-/**
- Enable symmetric room key backups
- 
- @remark NO by default
- */
-@property (nonatomic) BOOL enableSymmetricBackup;
-
-/**
- Enable new client information feature. (https://github.com/vector-im/element-meta/pull/656)
-
- @remark NO by default
- */
-@property (nonatomic) BOOL enableNewClientInformationFeature;
-
-/**
- Enable the calculating of progress during sync, incl counting the number
- of attempts to sync with the server and percentage of response data processed.
- 
- @remark NO by default
- */
-@property (nonatomic) BOOL enableSyncProgress;
 
 @end
 

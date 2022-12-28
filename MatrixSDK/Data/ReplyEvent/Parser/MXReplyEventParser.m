@@ -27,13 +27,13 @@ static NSString* const kFormattedBodyRegexPattern = @"(^<mx-reply>.+</mx-reply>)
     
     if (replyEvent.isReplyEvent)
     {
-        NSString *body = replyEvent.content[kMXMessageBodyKey];
+        NSString *body = replyEvent.content[@"body"];
         NSString *formattedBody = replyEvent.content[@"formatted_body"];
         
         MXReplyEventBodyParts *bodyParts = [self parseBody:body];
         MXReplyEventFormattedBodyParts *formattedBodyParts = [self parseFormattedBody:formattedBody];
         
-        if (bodyParts)
+        if (bodyParts && formattedBodyParts)
         {
             parts = [[MXReplyEventParts alloc] initWithBodyParts:bodyParts andFormattedBodyParts:formattedBodyParts];
         }
@@ -61,7 +61,7 @@ static NSString* const kFormattedBodyRegexPattern = @"(^<mx-reply>.+</mx-reply>)
     
     if (error)
     {
-        MXLogDebug(@"[MXReplyEventParser] Regex pattern %@ is not valid. Error: %@", kBodyReplyTextRegexPattern, error);
+        NSLog(@"[MXReplyEventParser] Regex pattern %@ is not valid. Error: %@", kBodyReplyTextRegexPattern, error);
     }
     else if(match && match.numberOfRanges == 2)
     {
@@ -97,7 +97,7 @@ static NSString* const kFormattedBodyRegexPattern = @"(^<mx-reply>.+</mx-reply>)
     
     if (error)
     {
-        MXLogDebug(@"[MXReplyEventParser] Regex pattern %@ is not valid. Error: %@", kFormattedBodyRegexPattern, error);
+        NSLog(@"[MXReplyEventParser] Regex pattern %@ is not valid. Error: %@", kFormattedBodyRegexPattern, error);
     }
     else if(match && match.numberOfRanges == 3)
     {        

@@ -339,7 +339,7 @@ static const char * const kProcessingQueueName = "org.MatrixSDK.MXScanManager";
         }
         else
         {
-            MXLogDebug(@"[MXScanManager] encrypt body failed, a server public key is required");
+            NSLog(@"[MXScanManager] encrypt body failed, a server public key is required");
             completion(nil);
         }
     }];
@@ -365,7 +365,7 @@ static const char * const kProcessingQueueName = "org.MatrixSDK.MXScanManager";
             
         } failure:^(NSError *error) {
             
-            MXLogDebug(@"[MXScanManager] get server key failed");
+            NSLog(@"[MXScanManager] get server key failed");
             completion(nil);
             
         }];
@@ -386,7 +386,7 @@ static const char * const kProcessingQueueName = "org.MatrixSDK.MXScanManager";
 
 - (void)resetAntivirusServerPublicKey
 {
-    MXLogDebug(@"[MXScanManager] reset server public key");
+    NSLog(@"[MXScanManager] reset server public key");
     _serverPublicKey = nil;
 }
 
@@ -528,7 +528,7 @@ static const char * const kProcessingQueueName = "org.MatrixSDK.MXScanManager";
                         }
                         else
                         {
-                            MXLogDebug(@"[MXScanManager] scan encrypted content failed, body encryption failed");
+                            NSLog(@"[MXScanManager] scan encrypted content failed, body encryption failed");
                             mediaScanFailure(nil);
                         }
                     }];

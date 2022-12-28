@@ -179,12 +179,4 @@ const UInt8 kOlmRecoveryKeyPrefix[] = {0x8B, 0x01};
     return data;
 }
 
-+ (BOOL)isValidRecoveryKey:(NSString *)recoveryKey
-{
-    NSError *error;
-    NSData *privateKeyOut = [MXRecoveryKey decode:recoveryKey error:&error];
-
-    return !error && privateKeyOut;
-}
-
 @end

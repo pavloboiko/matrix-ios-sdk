@@ -24,7 +24,7 @@
 
 #ifdef MX_CRYPTO
 
-@class MXLegacyCrypto;
+@class MXCrypto;
 
 /**
  A `MXKKeyRequestManager` object gathers incoming key requests from the attached
@@ -41,7 +41,7 @@
  @param crypto the related `MXCrypto`.
  @return the newly created `MXIncomingRoomKeyRequestManager` instance.
  */
-- (instancetype)initWithCrypto:(MXLegacyCrypto*)crypto;
+- (instancetype)initWithCrypto:(MXCrypto*)crypto;
 
 /**
  Stop the incoming key request manager.

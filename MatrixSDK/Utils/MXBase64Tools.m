@@ -58,10 +58,9 @@
 
 #pragma mark - Data
 
-+ (NSData *)dataFromBase64:(NSString *)base64
++ (NSData *)dataFromUnpaddedBase64:(NSString *)unpaddedBase64
 {
-    // Make sure we have a padded base64 string before calling NSData
-    NSString *base64String = [[self class] padBase64:base64];
+    NSString *base64String = [[self class] padBase64:unpaddedBase64];
     return [[NSData alloc] initWithBase64EncodedString:base64String options:NSDataBase64DecodingIgnoreUnknownCharacters];
 }
 

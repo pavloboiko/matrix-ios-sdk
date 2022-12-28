@@ -23,7 +23,6 @@
 #import "MXRealmEventScanMapper.h"
 #import "MXRealmMediaScanStore.h"
 #import "MXTools.h"
-#import "RLMRealm+MatrixSDK.h"
 
 @interface MXRealmEventScanStore()
 
@@ -88,7 +87,7 @@
     
     __block MXRealmEventScan *realmEventScan;
     
-    [realm transactionWithName:@"[MXRealmEventScanStore] createOrUpdateWithId" block:^{
+    [realm transactionWithBlock:^{
         
         MXRealmEventScan *foundRealmEventScan = [self findRealmEventScanWithId:eventId inRealm:realm];
         
@@ -132,7 +131,7 @@
     
     RLMRealm *realm = self.realm;
     
-    [realm transactionWithName:@"[MXRealmEventScanStore] updateAntivirusScanStatus" block:^{
+    [realm transactionWithBlock:^{
         MXRealmEventScan *realmEventScan = [self findRealmEventScanWithId:eventId inRealm:realm];
         
         if (realmEventScan)
@@ -156,7 +155,7 @@
     
     RLMRealm *realm = self.realm;
     
-    [realm transactionWithName:@"[MXRealmEventScanStore] updateAntivirusScanStatusFromMediaScansAntivirusScanStatusesAndAntivirusScanDate" block:^{
+    [realm transactionWithBlock:^{
         MXRealmEventScan *realmEventScan = [self findRealmEventScanWithId:eventId inRealm:realm];
         
         if (realmEventScan)
@@ -181,7 +180,7 @@
 {
     RLMRealm *realm = self.realm;
     
-    [realm transactionWithName:@"[MXRealmEventScanStore] resetAllAntivirusScanStatusInProgressToUnknown" block:^{
+    [realm transactionWithBlock:^{
         RLMResults *eventScansInProgress = [MXRealmEventScan objectsInRealm:realm where:@"%K = %d", MXRealmEventScanAttributes.antivirusScanStatusRawValue, MXAntivirusScanStatusInProgress];
         for (MXRealmEventScan *eventScan in eventScansInProgress)
         {
@@ -196,7 +195,7 @@
     
     __block NSArray *deletedEventScans;
     
-    [realm transactionWithName:@"[MXRealmEventScanStore] deleteAll" block:^{
+    [realm transactionWithBlock:^{
         RLMResults *realmEventScansToDelete = [MXRealmEventScan objectsInRealm:realm withPredicate:nil];
         deletedEventScans = [self eventScansFromResults:realmEventScansToDelete];
         [realm deleteObjects:realmEventScansToDelete];
@@ -265,7 +264,7 @@
         
         if (error)
         {
-            MXLogDebug(@"[MXRealmEventScanStore] Failed to open Realm on background worker: %@", error);
+            NSLog(@"[MXRealmEventScanStore] Failed to open Realm on background worker: %@", error);
         }
         else if (change)
         {

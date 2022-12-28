@@ -19,13 +19,8 @@
 
 #import "MXEventUnsignedData.h"
 #import "MXEventContentRelatesTo.h"
-#import "MXWarnings.h"
 
-@class MXEventDecryptionResult;
-@class MXEncryptedContentFile;
-@class MXEventContentLocation;
-
-MX_ASSUME_MISSING_NULLABILITY_BEGIN
+@class MXEventDecryptionResult, MXEncryptedContentFile;
 
 /**
  Types of Matrix events
@@ -73,14 +68,7 @@ typedef NS_ENUM(NSInteger, MXEventType)
     MXEventTypeCallInvite,
     MXEventTypeCallCandidates,
     MXEventTypeCallAnswer,
-    MXEventTypeCallSelectAnswer,
     MXEventTypeCallHangup,
-    MXEventTypeCallReject,
-    MXEventTypeCallNegotiate,
-    MXEventTypeCallReplaces,
-    MXEventTypeCallRejectReplacement,
-    MXEventTypeCallAssertedIdentity,
-    MXEventTypeCallAssertedIdentityUnstable,
     MXEventTypeSticker,
     MXEventTypeRoomTombStone,
     MXEventTypeKeyVerificationRequest,
@@ -93,15 +81,6 @@ typedef NS_ENUM(NSInteger, MXEventType)
     MXEventTypeKeyVerificationDone,
     MXEventTypeSecretRequest,
     MXEventTypeSecretSend,
-    MXEventTypeSecretStorageDefaultKey,
-    MXEventTypeTaggedEvents,
-    MXEventTypeSpaceChild,
-    MXEventTypePollStart,
-    MXEventTypePollResponse,
-    MXEventTypePollEnd,
-    MXEventTypeSpaceOrder,
-    MXEventTypeBeaconInfo,
-    MXEventTypeBeacon,
 
     // The event is a custom event. Refer to its `MXEventTypeString` version
     MXEventTypeCustom = 1000
@@ -136,7 +115,6 @@ FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomRedaction;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomThirdPartyInvite;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomRelatedGroups;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomPinnedEvents;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomMembership;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomTag;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringPresence;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringTypingNotification;
@@ -147,21 +125,9 @@ FOUNDATION_EXPORT NSString *const kMXEventTypeStringReadMarker;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallInvite;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallCandidates;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallAnswer;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallSelectAnswer;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallHangup;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallReject;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallNegotiate;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallReplaces;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallRejectReplacement;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallAssertedIdentity;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringCallAssertedIdentityUnstable;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringSticker;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringRoomTombStone;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringTaggedEvents;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringSpaceChild;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringSpaceOrder;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringSpaceOrderMSC3230;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringSpaceOrderKey;
 
 // Interactive key verification
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringKeyVerificationRequest;
@@ -177,32 +143,11 @@ FOUNDATION_EXPORT NSString *const kMXEventTypeStringKeyVerificationDone;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringSecretRequest;
 FOUNDATION_EXPORT NSString *const kMXEventTypeStringSecretSend;
 
-// Secret Storage
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringSecretStorageDefaultKey;
-
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringAutoJoinKey;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringSuggestedKey;
-
-// Polls
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringPollStartMSC3381;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringPollStart;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringPollResponseMSC3381;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringPollResponse;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringPollEndMSC3381;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringPollEnd;
-
-// Beacon
-
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringBeaconInfo;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringBeaconInfoMSC3672;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringBeacon;
-FOUNDATION_EXPORT NSString *const kMXEventTypeStringBeaconMSC3672;
 
 /**
  Types of room messages
  */
 typedef NSString* MXMessageType NS_REFINED_FOR_SWIFT;
-FOUNDATION_EXPORT NSString *const kMXMessageTypeKey;
 FOUNDATION_EXPORT NSString *const kMXMessageTypeText;
 FOUNDATION_EXPORT NSString *const kMXMessageTypeEmote;
 FOUNDATION_EXPORT NSString *const kMXMessageTypeNotice;
@@ -215,104 +160,16 @@ FOUNDATION_EXPORT NSString *const kMXMessageTypeServerNotice;
 FOUNDATION_EXPORT NSString *const kMXMessageTypeKeyVerificationRequest;
 
 /**
- Room message keys
- */
-FOUNDATION_EXPORT NSString *const kMXMessageBodyKey;
-FOUNDATION_EXPORT NSString *const kMXMessageGeoURIKey;
-
-/**
  Event relations
  */
-FOUNDATION_EXPORT NSString *const kMXEventRelationRelatesToKey;
 FOUNDATION_EXPORT NSString *const MXEventRelationTypeAnnotation;    // Reactions
 FOUNDATION_EXPORT NSString *const MXEventRelationTypeReference;     // Reply
 FOUNDATION_EXPORT NSString *const MXEventRelationTypeReplace;       // Edition
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyNewContent;   // Edited content key
-FOUNDATION_EXPORT NSString *const MXEventRelationTypeThread;        // Thread
-
-/**
- To-device messages
- */
-FOUNDATION_EXPORT NSString *const kMXToDeviceMessageId;
 
 /**
  Prefix used for id of temporary local event.
  */
 FOUNDATION_EXPORT NSString *const kMXEventLocalEventIdPrefix;
-
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyVoiceMessage;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyVoiceMessageMSC2516;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyVoiceMessageMSC3245;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAudio;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAudioMSC1767;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAudioDuration;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAudioWaveform;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleText;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleTextMSC1767;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleTimestamp;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleTimestampMSC3488;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleFile;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleFileMSC1767;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleFileSize;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleFileName;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleFileURL;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleFileMimeType;
-
-// Polls
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollStart;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollStartMSC3381;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollResponse;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollResponseMSC3381;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollEnd;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollEndMSC3381;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollQuestion;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollAnswers;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollAnswerId;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollMaxSelections;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollKind;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollKindDisclosed;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollKindDisclosedMSC3381;
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollKindUndisclosed;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensiblePollKindUndisclosedMSC3381;
-
-// Location
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleLocation;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleLocationMSC3488;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleLocationURI;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleLocationDescription;
-
-// Beacon
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleLocation;
-
-// Assets
-
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAsset;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAssetMSC3488;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAssetType;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAssetTypeUser;
-FOUNDATION_EXPORT NSString *const kMXMessageContentKeyExtensibleAssetTypePin;
-
-// Join Rules
-
-FOUNDATION_EXPORT NSString *const kMXJoinRulesContentKeyAllow;
-FOUNDATION_EXPORT NSString *const kMXJoinRulesContentKeyType;
-FOUNDATION_EXPORT NSString *const kMXJoinRulesContentKeyRoomId;
-
-// Threads support
-
-FOUNDATION_EXPORT NSString *const kMXEventTimelineMain;
-FOUNDATION_EXPORT NSString *const kMXEventUnthreaded;
 
 /**
  The internal event state used to handle the different steps of the event sending.
@@ -528,11 +385,6 @@ extern NSString *const kMXEventIdentifierKey;
 @property (nonatomic) NSError *sentError;
 
 /**
- Location information if any
- */
-@property (nonatomic, readonly, nullable) MXEventContentLocation *location;
-
-/**
  Indicates if the event hosts state data.
  */
 - (BOOL)isState;
@@ -573,11 +425,6 @@ extern NSString *const kMXEventIdentifierKey;
 - (BOOL)isReplyEvent;
 
 /**
- Return YES if the event contains a voice message
- */
-- (BOOL)isVoiceMessage;
-
-/**
  Return YES if the event content has been edited.
  */
 - (BOOL)contentHasBeenEdited;
@@ -588,13 +435,6 @@ extern NSString *const kMXEventIdentifierKey;
  This property is relevant only for events with 'kMXEventTypeStringReceipt' type.
  */
 - (NSArray *)readReceiptEventIds;
-
-/**
- Returns the thread IDs for which a read receipt is defined in this event.
- 
- This property is relevant only for events with 'kMXEventTypeStringReceipt' type.
- */
-- (NSArray *)readReceiptThreadIds;
 
 /**
  Returns the fully-qualified IDs of the users who sent read receipts with this event.
@@ -622,7 +462,7 @@ extern NSString *const kMXEventIdentifierKey;
 /**
  Returns the event with a new reference relation as it should come from the sync.
 
- @param referenceEvent The reference event.
+ @param event The reference event.
  @return Return an updated event with the new relation.
  */
 - (MXEvent*)eventWithNewReferenceRelation:(MXEvent*)referenceEvent;
@@ -651,19 +491,6 @@ extern NSString *const kMXEventIdentifierKey;
  */
 - (BOOL)isContentScannable;
 
-#pragma mark - Threading
-
-/**
- Return YES if the event is in a thread.
- */
-- (BOOL)isInThread;
-
-/**
- Thread id for the event. This is actually the eventId of the thread's root event.
- nil if the event is not in a thread.
- */
-@property (nonatomic, readonly, nullable) NSString *threadId;
-
 #pragma mark - Crypto
 
 /**
@@ -686,12 +513,6 @@ extern NSString *const kMXEventIdentifierKey;
  This is a small MXEvent instance with typically value for `type` and 'content' fields.
  */
 @property (nonatomic, readonly) MXEvent *clearEvent;
-
-/**
- Flag indicating the event was decrypted with an untrusted key.
- If the event cannot be decrypted yet or the event not encrypted at all, this flag would be NO.
- */
-@property (nonatomic, readonly, getter=isUntrusted) BOOL untrusted;
 
 /**
  The curve25519 key for the device that we think sent this event.
@@ -758,5 +579,3 @@ extern NSString *const kMXEventIdentifierKey;
 - (NSArray<MXEncryptedContentFile*>*)getEncryptedContentFiles;
 
 @end
-
-MX_ASSUME_MISSING_NULLABILITY_END

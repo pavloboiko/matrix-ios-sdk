@@ -19,9 +19,6 @@
 #import "MXRealmEventScan.h"
 #import "MXRealmMediaScan.h"
 
-#import "MXLog.h"
-#import "RLMRealm+MatrixSDK.h"
-
 @interface MXScanRealmInMemoryProvider()
 
 @property (nonatomic, strong) RLMRealmConfiguration *realmConfiguration;
@@ -53,7 +50,7 @@
     
     if (error)
     {
-        MXLogDebug(@"[MXScanRealmInMemoryProvider] realmForUser gets error: %@", error);
+        NSLog(@"[MXScanRealmInMemoryProvider] realmForUser gets error: %@", error);
     }
     
     return realm;
@@ -63,7 +60,7 @@
 {
     RLMRealm *realm = [self realm];
     
-    [realm transactionWithName:@"[MXScanRealmInMemoryProvider] deleteAllObjects" block:^{
+    [realm transactionWithBlock:^{
         [realm deleteAllObjects];
     }];
 }

@@ -55,12 +55,11 @@
     // Make sure Alice and Bob have activities
     [matrixSDKTestsData doMXRestClientTestWithBobAndAliceInARoom:self readyToTest:^(MXRestClient *bobRestClient, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
 
-        [bobRestClient sendTextMessageToRoom:roomId threadId:nil text:@"Hi Alice!" success:^(NSString *eventId) {
+        [bobRestClient sendTextMessageToRoom:roomId text:@"Hi Alice!" success:^(NSString *eventId) {
 
-            [aliceRestClient sendTextMessageToRoom:roomId threadId:nil text:@"Hi Bob!" success:^(NSString *eventId) {
+            [aliceRestClient sendTextMessageToRoom:roomId text:@"Hi Bob!" success:^(NSString *eventId) {
 
                 mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-                [matrixSDKTestsData retain:mxSession];
 
                 // Start the session
                 [mxSession start:^{
@@ -217,7 +216,6 @@
     [matrixSDKTestsData doMXRestClientTestWithAlice:self readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation) {
 
         mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:mxSession];
 
         XCTAssertNil(mxSession.myUser);
 
@@ -268,8 +266,6 @@
 //        [mxSession close];
 //
 //        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-//        [matrixSDKTestsData retain:mxSession];
-//
 //        [mxSession start:^{
 //
 //            [mxSession.myUser listenToUserUpdate:^(MXEvent *event) {
@@ -306,8 +302,6 @@
 //        [mxSession close];
 //
 //        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-//        [matrixSDKTestsData retain:mxSession];
-//
 //        [mxSession start:^{
 //
 //            [mxSession.myUser listenToUserUpdate:^(MXEvent *event) {

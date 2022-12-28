@@ -58,11 +58,7 @@ NSUInteger count = 0;
 - (void)throttle:(dispatch_block_t)block
 {
     // Cancel any existing work item if it has not yet executed
-    if (workItem)
-    {
-        MXLogDebug(@"[MXThrottler] throttle: Cancel previous block");
-        workItem = nil;
-    }
+    workItem = nil;
     
     // Re-assign workItem with the new block task, resetting the previousRun time when it executes
     MXWeakify(self);
@@ -71,7 +67,6 @@ NSUInteger count = 0;
 
         self->previousRun = [NSDate new];
         block();
-        self->workItem = nil;
     };
     
     if (isTimerArmed)
@@ -87,19 +82,13 @@ NSUInteger count = 0;
     NSTimeInterval delay = [[NSDate new] timeIntervalSinceDate:previousRun] > _minimumDelay ? 0 : _minimumDelay;
     if (delay == 0)
     {
-        dispatch_async(_queue, ^{
-            MXStrongifyAndReturnIfNil(self);
-            
-            if (self->workItem)
-            {
-                self->workItem();
-            }
-        });
+        if (workItem)
+        {
+            workItem();
+        }
     }
     else
     {
-        MXLogDebug(@"[MXThrottler] throttle: Delay block by %@s", @(delay));
-        
         isTimerArmed = YES;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), _queue, ^{
             MXStrongifyAndReturnIfNil(self);

@@ -23,16 +23,12 @@
 #endif
 
 #import "MXCallStackCall.h"
-#import "MXCallHangupEventContent.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class MXCallManager;
 @class MXEvent;
 @class MXRoom;
-@class MXUserModel;
-@class MXAssertedIdentityModel;
-@class MXiOSAudioOutputRouter;
 
 /**
  Call states.
@@ -50,8 +46,6 @@ typedef NS_ENUM(NSUInteger, MXCallState)
     MXCallStateConnecting,
 
     MXCallStateConnected,
-    MXCallStateOnHold,
-    MXCallStateRemotelyOnHold,
     MXCallStateEnded,
 
     MXCallStateInviteExpired,
@@ -67,7 +61,7 @@ typedef NS_ENUM(NSInteger, MXCallEndReason)
     MXCallEndReasonHangup, // The call was ended by the local side
     MXCallEndReasonHangupElsewhere, // The call was ended on another device
     MXCallEndReasonRemoteHangup, // The call was ended by the remote side
-    MXCallEndReasonBusy, // The call was declined by the local/remote side before it was being established.
+    MXCallEndReasonBusy, // The call was declined by the remote side before it was being established. Only for outgoing calls
     MXCallEndReasonMissed, // The call wasn't established in a given period of time
     MXCallEndReasonAnsweredElseWhere // The call was answered on another device
 };
@@ -77,18 +71,6 @@ typedef NS_ENUM(NSInteger, MXCallEndReason)
  The notification object is the `MXKCall` object representing the call.
  */
 extern NSString *const kMXCallStateDidChange;
-
-/**
- Posted when a `MXCall` object has changed its status to support holding.
- The notification object is the `MXKCall` object representing the call.
- */
-extern NSString *const kMXCallSupportsHoldingStatusDidChange;
-
-/**
- Posted when a `MXCall` object has changed its status to support transferring.
- The notification object is the `MXKCall` object representing the call.
- */
-extern NSString *const kMXCallSupportsTransferringStatusDidChange;
 
 @protocol MXCallDelegate;
 
@@ -138,99 +120,10 @@ extern NSString *const kMXCallSupportsTransferringStatusDidChange;
 - (void)answer;
 
 /**
- Hang up a call in progress or reject an incoming call. If an in progress call, calls -[MXCall hangupWithReason:signal] method with `MXCallHangupReasonUserHangup` and `YES`.
+ Hang up a call in progress or reject an incoming call.
  */
 - (void)hangup;
 
-/**
- Hang up a call in progress with a reason.
-
- @param reason hangup reason
- */
-- (void)hangupWithReason:(MXCallHangupReason)reason;
-
-/**
- Hang up a call in progress with a reason and a signalling flag.
-
- @param reason hangup reason
- @param signal signal the hang up or not
- */
-- (void)hangupWithReason:(MXCallHangupReason)reason
-                  signal:(BOOL)signal;
-
-#pragma mark - Hold
-
-/**
- Flag to indicate that the call can be holded.
- */
-@property (nonatomic, readonly) BOOL supportsHolding;
-
-/**
- Hold/unhold the call. The call must be connected to hold and must be already holded to unhold the call.
- Please note that also remotely holded calls cannot be unholded.
- */
-- (void)hold:(BOOL)hold;
-
-/**
- Call is on hold, locally or remotely.
- */
-@property (nonatomic, readonly) BOOL isOnHold;
-
-#pragma mark - Transfer
-
-/**
- Flag to indicate that the call can be transferred.
- */
-@property (nonatomic, readonly) BOOL supportsTransferring;
-
-/// Attempts to send an `m.call.replaces` event to the signaling room for this call.
-/// @param targetRoomId Tells other party about the transfer target room. Optional. If specified, the transferee waits for an invite to this room and after join continues the transfer in this room. Otherwise, the transferee contacts the user given in the `targetUser` field in a room of its choosing.
-/// @param targetUser Tells other party about the target user of the call transfer. Optional for the calls to the transfer target.
-/// @param createCallId Tells other party to create a new call with this identifier. Mutually exclusive with `awaitCallId`.
-/// @param awaitCallId Tells other party to wait for a call with this identifier. Mutually exclusive with `createCallId`.
-/// @param success Success block. Returns event identifier for the event
-/// @param failure Failure block. Returns error
-- (void)transferToRoom:(NSString * _Nullable)targetRoomId
-                  user:(MXUserModel * _Nullable)targetUser
-            createCall:(NSString * _Nullable)createCallId
-             awaitCall:(NSString * _Nullable)awaitCallId
-               success:(void (^)(NSString * _Nonnull eventId))success
-               failure:(void (^)(NSError * _Nullable error))failure;
-
-/**
- Flag to indicate that the call is a call to consult a transfer.
- */
-@property (nonatomic, assign, getter=isConsulting) BOOL consulting;
-
-/**
- Transferee of the transfer. Should be provided when `consulting` is YES.
- */
-@property (nonatomic, strong) MXCall *callWithTransferee;
-
-/**
- Transferee of the transfer. Should be provided when `consulting` is YES.
- */
-@property (nonatomic, copy) MXUserModel *transferee;
-
-/**
- Target of the transfer. Should be provided when `consulting` is YES.
- */
-@property (nonatomic, copy) MXUserModel *transferTarget;
-
-#pragma mark - DTMF
-
-/**
- Indicates whether this call can send DTMF tones.
- This property will be false if the call is not connected yet.
- */
-@property (nonatomic, readonly) BOOL supportsDTMF;
-
-/**
- Creates a task to send given DTMF tones in the call. If there is a task already running, it'll be canceled.
- @param tones DTMF tones to be sent. Allowed characters: [0-9], [A-D], '#', `*`. Case insensitive. Comma (',') will cause a 2 seconds delay before sending next character.
- @returns Whether the operation succeeded or not.
- */
-- (BOOL)sendDTMF:(NSString * _Nonnull)tones;
 
 #pragma mark - Properties
 /**
@@ -291,16 +184,6 @@ extern NSString *const kMXCallSupportsTransferringStatusDidChange;
 @property (readonly, nonatomic) NSString *callerId;
 
 /**
- The display name of the caller. Nil for outgoing calls. Direct user's display name if the room is direct, otherwise display name of the room.
- */
-@property (nonatomic, nullable) NSString *callerName;
-
-/**
- The party id for this call. Will be generated on first access.
- */
-@property (readonly, nonatomic, copy) NSString *partyId;
-
-/**
  The user id of the callee. Nil for conference calls
  */
 - (void)calleeId:(void (^)(NSString *calleeId))onComplete;
@@ -341,12 +224,11 @@ extern NSString *const kMXCallSupportsTransferringStatusDidChange;
  */
 @property (nonatomic) BOOL videoMuted;
 
-#if TARGET_OS_IPHONE
 /**
- Audio output router.
+ NO by default, the inbound audio is then routed to the default audio outputs.
+ If YES, the inbound audio is sent to the main speaker.
  */
-@property (nonatomic, readonly) MXiOSAudioOutputRouter *audioOutputRouter API_AVAILABLE(ios(10.0));
-#endif
+@property (nonatomic) BOOL audioToSpeaker;
 
 /**
  The camera to use.
@@ -358,11 +240,6 @@ extern NSString *const kMXCallSupportsTransferringStatusDidChange;
  The call duration in milliseconds.
  */
 @property (nonatomic, readonly) NSUInteger duration;
-
-/**
- The asserted identity for the call. May be nil.
- */
-@property (nonatomic, copy, nullable) MXAssertedIdentityModel *assertedIdentity;
 
 /**
  The delegate.
@@ -391,50 +268,13 @@ extern NSString *const kMXCallSupportsTransferringStatusDidChange;
 @optional
 
 /**
- Tells the delegate that status of the call to support holding has changed.
- @param call the instance that changes
- */
-- (void)callSupportsHoldingStatusDidChange:(MXCall *)call;
-
-/**
- Tells the delegate that status of the call to support transferring has changed.
- @param call the instance that changes
- */
-- (void)callSupportsTransferringStatusDidChange:(MXCall *)call;
-
-/**
- Tells the delegate that `isConsulting` property of the call has changed.
- @param call the instance that changes
- */
-- (void)callConsultingStatusDidChange:(MXCall *)call;
-
-/**
- Tells the delegate that `assertedIdentity` property of the call has changed.
- @param call the instance that changes
- */
-- (void)callAssertedIdentityDidChange:(MXCall *)call;
-
-/**
- Tells the delegate that `audioOutputRouter.routeType` property of the call has changed.
- @param call the instance that changes
- */
-- (void)callAudioOutputRouteTypeDidChange:(MXCall *)call;
-
-/**
- Tells the delegate that `audioOutputRouter.availableOutputRouteTypes` property of the call has changed.
- @param call the instance that changes
- */
-- (void)callAvailableAudioOutputsDidChange:(MXCall *)call;
-
-/**
  Tells the delegate an error occured.
  The call cannot be established.
 
  @param call the instance that changes.
  @param error the error.
- @param reason The hangup reason, which would be sent if this method was not implemented.
  */
-- (void)call:(MXCall *)call didEncounterError:(NSError *)error reason:(MXCallHangupReason)reason;
+- (void)call:(MXCall *)call didEncounterError:(NSError *)error;
 
 @end
 

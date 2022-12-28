@@ -31,7 +31,7 @@
  The underlying HTTP request.
  The reference changes in case of retries.
  */
-@property (nonatomic, nullable) NSURLSessionDataTask *operation;
+@property (nonatomic) NSURLSessionDataTask *operation;
 
 /**
  The age in milliseconds of the instance.
@@ -61,11 +61,6 @@
 @property (nonatomic, readonly, getter=isCancelled) BOOL canceled;
 
 /**
- The HTTP response.
- */
-@property (nonatomic, nullable) NSHTTPURLResponse *httpResponse;
-
-/**
  Cancel the HTTP request.
  */
 - (void)cancel;
@@ -79,7 +74,7 @@
  
  @param operation the other operation to copy data from. If the other operation is nil do nothing.
  */
-- (void)mutateTo:(MXHTTPOperation* _Nullable)operation;
+- (void)mutateTo:(MXHTTPOperation*)operation;
 
 /**
  Extract the NSHTTPURLResponse from an error.
@@ -87,6 +82,6 @@
  @param error the request error.
  @return the HTTP response.
  */
-+ (NSHTTPURLResponse * _Nullable)urlResponseFromError:(NSError* _Nullable)error;
++ (NSHTTPURLResponse *)urlResponseFromError:(NSError*)error;
 
 @end

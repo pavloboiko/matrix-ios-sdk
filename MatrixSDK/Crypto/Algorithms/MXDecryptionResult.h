@@ -84,9 +84,4 @@ FOUNDATION_EXPORT NSString* const MXDecryptingErrorMissingPropertyReason;
  */
 @property NSArray<NSString *> *forwardingCurve25519KeyChain;
 
-/**
- Flag indicating the decrpytion was made with an untrusted session.
- */
-@property (nonatomic, getter=isUntrusted) BOOL untrusted;
-
 @end

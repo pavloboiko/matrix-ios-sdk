@@ -32,7 +32,9 @@
         self.hasReachedHomeServerPaginationEnd = [aDecoder decodeBoolForKey:@"hasReachedHomeServerPaginationEnd"];
         self.hasLoadedAllRoomMembersForRoom = [aDecoder decodeBoolForKey:@"hasLoadedAllRoomMembersForRoom"];
 
-        self.partialAttributedTextMessage = [aDecoder decodeObjectForKey:@"partialAttributedTextMessage"];
+        self.partialTextMessage = [aDecoder decodeObjectForKey:@"partialTextMessage"];
+
+        outgoingMessages = [aDecoder decodeObjectForKey:@"outgoingMessages"];
 
         // Rebuild the messagesByEventIds cache
         for (MXEvent *event in messages)
@@ -65,10 +67,12 @@
     [aCoder encodeBool:self.hasReachedHomeServerPaginationEnd forKey:@"hasReachedHomeServerPaginationEnd"];
     [aCoder encodeBool:self.hasLoadedAllRoomMembersForRoom forKey:@"hasLoadedAllRoomMembersForRoom"];
 
-    if (self.partialAttributedTextMessage)
+    if (self.partialTextMessage)
     {
-        [aCoder encodeObject:self.partialAttributedTextMessage forKey:@"partialAttributedTextMessage"];
+        [aCoder encodeObject:self.partialTextMessage forKey:@"partialTextMessage"];
     }
+
+    [aCoder encodeObject:[outgoingMessages mutableCopy] forKey:@"outgoingMessages"];
 }
 
 @end

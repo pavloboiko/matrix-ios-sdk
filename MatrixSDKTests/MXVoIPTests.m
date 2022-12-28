@@ -22,12 +22,11 @@
 #import "MXMockCallStack.h"
 #import "MXMockCallStackCall.h"
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wnonnull"
-
 @interface MXVoIPTests : XCTestCase
 {
     MatrixSDKTestsData *matrixSDKTestsData;
+
+    MXSession *mxSession;
 }
 
 @end
@@ -43,6 +42,12 @@
 
 - (void)tearDown
 {
+    if (mxSession)
+    {
+        [mxSession close];
+        mxSession = nil;
+    }
+
     matrixSDKTestsData = nil;
     
     [super tearDown];
@@ -52,8 +57,9 @@
 #pragma mark - Tests with no call stack
 - (void)testNoVoIPStackMXRoomCall
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *mxSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
 
+        mxSession = bobSession;
         MXRoom *room = [mxSession roomWithRoomId:roomId];
 
         // Make sure there is no VoIP stack
@@ -73,7 +79,9 @@
 
 - (void)testNoVoIPStackOnCallInvite
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *mxSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+
+        mxSession = bobSession;
 
         // Make sure there is no VoIP stack
         mxSession.callManager.callStack = nil;
@@ -88,10 +96,8 @@
                                           @"type": @"offer",
                                           @"sdp": @"A SDP"
                                           },
-                                  @"version": kMXCallVersion,
-                                  @"lifetime": @(30 * 1000),
-                                  @"invitee": mxSession.myUserId,
-                                  @"party_id": mxSession.myDeviceId
+                                  @"version": @(0),
+                                  @"lifetime": @(30 * 1000)
                                   };
 
 
@@ -103,7 +109,7 @@
             [expectation fulfill];
         }];
 
-        [aliceRestClient sendEventToRoom:roomId threadId:nil eventType:kMXEventTypeStringCallInvite content:content txnId:nil success:nil failure:^(NSError *error) {
+        [aliceRestClient sendEventToRoom:roomId eventType:kMXEventTypeStringCallInvite content:content txnId:nil success:nil failure:^(NSError *error) {
             XCTFail(@"Cannot set up intial test conditions - error: %@", error);
             [expectation fulfill];
         }];
@@ -139,5 +145,3 @@
 
 
 @end
-
-#pragma clang diagnostic pop

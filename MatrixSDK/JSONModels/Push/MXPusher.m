@@ -16,17 +16,13 @@
 
 #import "MXPusher.h"
 
-NSString *const kMXPusherEnabledKey  = @"org.matrix.msc3881.enabled";
-NSString *const kMXPusherDeviceIdKey = @"org.matrix.msc3881.device_id";
-
 @implementation MXPusher
 
 + (id)modelFromJSON:(NSDictionary *)JSONDictionary
 {
     MXPusher *pusher;
 
-    NSString *pushkey, *kind, *appId, *appDisplayName, *deviceDisplayName, *profileTag, *lang, *deviceId;
-    NSNumber *enabled;
+    NSString *pushkey, *kind, *appId, *appDisplayName, *deviceDisplayName, *profileTag, *lang;
     MXJSONModelSetString(pushkey, JSONDictionary[@"pushkey"]);
     MXJSONModelSetString(kind, JSONDictionary[@"kind"]);
     MXJSONModelSetString(appId, JSONDictionary[@"app_id"]);
@@ -34,11 +30,6 @@ NSString *const kMXPusherDeviceIdKey = @"org.matrix.msc3881.device_id";
     MXJSONModelSetString(deviceDisplayName, JSONDictionary[@"device_display_name"]);
     MXJSONModelSetString(profileTag, JSONDictionary[@"profile_tag"]);
     MXJSONModelSetString(lang, JSONDictionary[@"lang"]);
-    if (JSONDictionary[kMXPusherEnabledKey])
-    {
-        MXJSONModelSetNumber(enabled, JSONDictionary[kMXPusherEnabledKey]);
-    }
-    MXJSONModelSetString(deviceId, JSONDictionary[kMXPusherDeviceIdKey]);
 
     MXPusherData *data;
     MXJSONModelSetMXJSONModel(data, MXPusherData, JSONDictionary[@"data"]);
@@ -54,8 +45,6 @@ NSString *const kMXPusherDeviceIdKey = @"org.matrix.msc3881.device_id";
         pusher->_profileTag = profileTag;
         pusher->_lang = lang;
         pusher->_data = data;
-        pusher->_enabled = enabled;
-        pusher->_deviceId = deviceId;
     }
 
     return pusher;

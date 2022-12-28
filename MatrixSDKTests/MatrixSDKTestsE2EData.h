@@ -15,7 +15,6 @@
  */
 
 #import <Foundation/Foundation.h>
-#import <OLMKit/OLMKit.h>
 
 #import "MXSDKOptions.h"
 
@@ -81,16 +80,7 @@
                           warnOnUnknowDevices:(BOOL)warnOnUnknowDevices
                                   readyToTest:(void (^)(MXSession *aliceSession, MXSession *bobSession, MXSession *samSession, NSString *roomId, XCTestExpectation *expectation))readyToTest;
 
-- (void)loginUserOnANewDevice:(XCTestCase*)testCase
-                  credentials:(MXCredentials*)credentials
-                 withPassword:(NSString*)password
-                   onComplete:(void (^)(MXSession *newSession))onComplete;
-
-- (void)loginUserOnANewDevice:(XCTestCase*)testCase
-                  credentials:(MXCredentials*)credentials
-                 withPassword:(NSString*)password
-                        store:(id<MXStore>)store
-                   onComplete:(void (^)(MXSession *newSession))onComplete;
+- (void)loginUserOnANewDevice:(MXCredentials*)credentials withPassword:(NSString*)password onComplete:(void (^)(MXSession *newSession))onComplete;
 
 
 #pragma mark - Cross-signing

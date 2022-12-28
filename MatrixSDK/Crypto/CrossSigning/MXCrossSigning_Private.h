@@ -22,8 +22,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface MXLegacyCrossSigning ()
+@interface MXCrossSigning ()
 
+@property (nonatomic) MXCrossSigningInfo *myUserCrossSigningKeys;
 @property (nonatomic) MXCrossSigningTools *crossSigningTools;
 
 /**
@@ -31,16 +32,12 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param crypto the related 'MXCrypto' instance.
  */
-- (instancetype)initWithCrypto:(MXLegacyCrypto *)crypto;
+- (instancetype)initWithCrypto:(MXCrypto *)crypto;
 
 - (BOOL)isUserWithCrossSigningKeysVerified:(MXCrossSigningInfo*)crossSigningKeys;
 - (BOOL)isDeviceVerified:(MXDeviceInfo*)device;
 
 - (void)requestPrivateKeys;
-
-- (void)signObject:(NSDictionary*)object withKeyType:(NSString*)keyType
-           success:(void (^)(NSDictionary *signedObject))success
-           failure:(void (^)(NSError *error))failure;
 
 @end
 

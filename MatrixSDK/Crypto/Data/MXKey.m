@@ -16,15 +16,9 @@
 
 #import "MXKey.h"
 
-@interface MXKey()
-
-/**
- * We have to store the original key dictionary because it can contain other fields
- * that we don't support yet but they would be needed to check signatures
- */
-@property (nonatomic, strong) NSDictionary *signalableJSONDictionary;
-
-@end
+NSString *const kMXKeyCurve25519Type = @"curve25519";
+NSString *const kMXKeySignedCurve25519Type = @"signed_curve25519";
+NSString *const kMXKeyEd25519Type = @"ed25519";
 
 @implementation MXKey
 
@@ -69,7 +63,7 @@
     }
     else
     {
-        MXLogDebug(@"[MXKey] setKeyFullId: ERROR: cannot process keyFullId: %@", keyFullId);
+        NSLog(@"[MXKey] setKeyFullId: ERROR: cannot process keyFullId: %@", keyFullId);
     }
 }
 
@@ -83,12 +77,6 @@
         MXJSONModelSetString(key.keyFullId, JSONDictionary.allKeys[0]);
         MXJSONModelSetString(key.value, JSONDictionary[key.keyFullId][@"key"]);
         key.signatures = [[MXUsersDevicesMap<NSString*> alloc] initWithMap:JSONDictionary[key.keyFullId][@"signatures"]];
-        
-        NSMutableDictionary *signableJSONDictionary = [JSONDictionary[key.keyFullId] mutableCopy];
-        [signableJSONDictionary removeObjectForKey:@"signatures"];
-        [signableJSONDictionary removeObjectForKey:@"unsigned"];
-       
-        key.signalableJSONDictionary = signableJSONDictionary;
     }
 
     return key;
@@ -97,25 +85,22 @@
 - (NSDictionary *)JSONDictionary
 {
     NSDictionary *JSONDictionary;
-    
+
     NSString *keyFullId = self.keyFullId;
-    if (keyFullId && self.value)
+    if (keyFullId && _value)
     {
         JSONDictionary = @{
-            keyFullId: self.value
-        };
+                           keyFullId: _value
+                           };
     }
     return JSONDictionary;
 }
 
 - (NSDictionary *)signalableJSONDictionary
 {
-    if (_signalableJSONDictionary == nil)
-    {
-        return @{ @"key": self.value };
-    }
-    
-    return _signalableJSONDictionary;
+    return @{
+             @"key": _value
+             };
 }
 
 - (NSString *)description

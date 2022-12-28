@@ -80,28 +80,33 @@
         if (stringValue)
         {
             NSInteger value = [[is substringWithRange:range] integerValue];
-            NSUInteger roomMemberCount = roomState.membersCount.members;
-            
+
             // Check the targeted room member count against value
-            if (nil == op || [op isEqualToString:@"=="])
+            MXRoom *room = [mxSession roomWithRoomId:event.roomId];
+            
+            // sanity checks
+            if (room && room.summary)
             {
-                isSatisfied = (value == roomMemberCount);
-            }
-            else if ([op isEqualToString:@"<"])
-            {
-                isSatisfied = (value < roomMemberCount);
-            }
-            else if ([op isEqualToString:@">"])
-            {
-                isSatisfied = (value > roomMemberCount);
-            }
-            else if ([op isEqualToString:@">="])
-            {
-                isSatisfied = (value >= roomMemberCount);
-            }
-            else if ([op isEqualToString:@"<="])
-            {
-                isSatisfied = (value <= roomMemberCount);
+                if (nil == op || [op isEqualToString:@"=="])
+                {
+                    isSatisfied = (value == room.summary.membersCount.members);
+                }
+                else if ([op isEqualToString:@"<"])
+                {
+                    isSatisfied = (value < room.summary.membersCount.members);
+                }
+                else if ([op isEqualToString:@">"])
+                {
+                    isSatisfied = (value > room.summary.membersCount.members);
+                }
+                else if ([op isEqualToString:@">="])
+                {
+                    isSatisfied = (value >= room.summary.membersCount.members);
+                }
+                else if ([op isEqualToString:@"<="])
+                {
+                    isSatisfied = (value <= room.summary.membersCount.members);
+                }
             }
         }
     }

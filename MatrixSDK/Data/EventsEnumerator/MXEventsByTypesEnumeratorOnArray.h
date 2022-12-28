@@ -18,25 +18,20 @@
 #import <Foundation/Foundation.h>
 
 #import "MXEventsEnumerator.h"
-#import "MXEventsEnumeratorOnArray.h"
 
 /**
- Generic events enumerator on an array of event identifiers with a filter on events types.
+ Generic events enumerator on an array of events with a filter on events types.
  */
 @interface MXEventsByTypesEnumeratorOnArray : NSObject <MXEventsEnumerator>
 
 /**
- Construct an enumerator based on an array of event identifiers.
+ Construct an enumerator based on a events array.
 
- @param eventIds the list of eventIds to enumerate on.
+ @param messages the list of messages to enumerate on.
  @param types an array of event types strings to use as a filter filter.
- @param dataSource object responsible for translating an event identifier into
-                   the most recent version of the event.
 
  @return the newly created instance.
  */
-- (instancetype)initWithEventIds:(NSArray<NSString *> *)eventIds
-                      andTypesIn:(NSArray*)types
-                      dataSource:(id<MXEventsEnumeratorDataSource>)dataSource;
+- (instancetype)initWithMessages:(NSArray<MXEvent*> *)messages andTypesIn:(NSArray*)types;
 
 @end

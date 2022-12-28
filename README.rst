@@ -1,14 +1,3 @@
-.. image:: https://img.shields.io/cocoapods/v/MatrixSDK?style=flat-square
-   :target: https://github.com/matrix-org/matrix-ios-sdk/releases
-.. image:: https://img.shields.io/cocoapods/p/MatrixSDK?style=flat-square
-   :target: README.rst
-.. image:: https://img.shields.io/github/workflow/status/matrix-org/matrix-ios-sdk/Lint%20CI/develop?style=flat-square
-   :target: https://github.com/matrix-org/matrix-ios-sdk/actions?query=branch%3Adevelop
-.. image:: https://codecov.io/gh/matrix-org/matrix-ios-sdk/branch/develop/graph/badge.svg?token=2c9mzJoVpu
-   :target: https://codecov.io/gh/matrix-org/matrix-ios-sdk
-.. image:: https://img.shields.io/badge/License-Apache%202.0-yellowgreen.svg?style=flat-square
-   :target: https://opensource.org/licenses/Apache-2.0
-
 Matrix iOS SDK
 ==============
 
@@ -32,16 +21,26 @@ In order to set this up::
 The best way to add the last release of the Matrix SDK to your application
 project is to add the MatrixSDK dependency to your Podfile::
 
+    # Obj-C
     pod 'MatrixSDK'
+
+    # Swift
+    pod 'SwiftMatrixSDK'
 
 If you want to use the develop version of the SDK, use instead:
 
+    # Obj-C
     pod 'MatrixSDK', :git => 'https://github.com/matrix-org/matrix-ios-sdk.git',
     :branch => 'develop'
 
+    # Swift
+    pod 'SwiftMatrixSDK', :git => 'https://github.com/matrix-org/matrix-ios-sdk.git',
+    :branch => 'develop'
+
+
 Options
 =======
-If you want to enable VoIP using the http://webrtc.org VoIP stack, add the following pod to your app Podfile::
+If you want to enable VoIP using the http://webrtc.org VoIP stack, add the following pod to you app Podfile::
 
     pod 'MatrixSDK/JingleCallStack'
 
@@ -82,7 +81,7 @@ They contain logic to maintain consistent chat room data.
 :``MXUser``:
      This is a user known by the current user, outside of the context of a
      room. MXSession exposes and maintains the list of MXUsers. It provides
-     the user id, displayname and the current presence state.
+     the user id, displayname and the current presence state
 
 Usage
 =====
@@ -100,7 +99,7 @@ One file to import:
 
 **Swift**::
 
-    import MatrixSDK
+    import SwiftMatrixSDK
 
 Use case #1: Get public rooms of an homeserver
 -----------------------------------------------
@@ -113,7 +112,7 @@ instantiated with initWithHomeServer does the job:
     [mxRestClient publicRooms:^(NSArray *rooms) {
 
         // rooms is an array of MXPublicRoom objects containing information like room id
-        MXLogDebug(@"The public rooms are: %@", rooms);
+        NSLog(@"The public rooms are: %@", rooms);
 
     } failure:^(MXError *error) {
     }];
@@ -474,61 +473,27 @@ Tests
 =====
 The tests in the SDK Xcode project are both unit and integration tests.
 
-Unit tests classes use the suffix "UnitTests" to differentiate them. A unit test is a test that does not make any HTTP requests or uses mocked HTTP requests.
-
 Out of the box, the tests use one of the homeservers (located at
 http://localhost:8080) of the "Demo Federation of Homeservers"
-(https://matrix-org.github.io/synapse/develop/development/demo.html?highlight=demo#synapse-demo-setup).
-
-Before you install synapse you may need few dependencies to be installed on Mac OS:
-
-- **Homebrew**: run ``/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)”``. More information can be found here https://brew.sh
-- **python 3**: downloading the latest stable version should be fine. Download the ``.pkg`` and install it from here https://www.python.org/downloads/
-- **pipx**: with python installed run ``pip3 install --user pipx``
-- **Rust**: run ``curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh``. more information can be found here https://www.rust-lang.org/tools/install
-- **icu4c**: Run ``brew install icu4c``
-- **Update env variables for icu4c**: if you use zsh run ``echo 'export PATH="/opt/homebrew/opt/icu4c/bin:$PATH"' >> ~/.zshrc``. Otherwise try to update ``.bash_profile`` in the same way. You may have configured another folder for brew binaries. In that case try to run ``brew info icu4c`` to spot the correct path.
-- **pg_config**: you can get it by running ``brew install postgresql``
+(https://github.com/matrix-org/synapse#running-a-demo-federation-of-synapses). 
 
 You first need to follow instructions to set up Synapse in development mode at https://github.com/matrix-org/synapse#synapse-development.
-The cookbook is::
+If you have already installed all dependencies, the steps are::
 
-      $ pip install --user pipx
-      $ python3 -m pipx ensurepath   # To run if `pipx install poetry` complained about PATH not being correctly set
-      $ pipx install poetry
       $ git clone https://github.com/matrix-org/synapse.git
       $ cd synapse
-      $ poetry install --extras all
+      $ virtualenv -p python3 env
+      $ source env/bin/activate
+      (env) $ python -m pip install --no-use-pep517 -e .
 
-To launch these test homeservers, type from the synapse root folder::
+Every time you want to launch these test homeservers, type::
 
-      $ poetry run ./demo/start.sh --no-rate-limit
-
-To verify that the synapse instance is actually running correctly, open a web browser and go to `http://127.0.0.1:8080`. A web page should confirm it.
-
-To stop and reset the servers::
-
-      $ poetry run ./demo/stop.sh
-      $ poetry run ./demo/clean.sh
+      $ virtualenv -p python3 env
+      $ source env/bin/activate
+      (env) $ demo/start.sh --no-rate-limit
 
 You can now run tests from the Xcode Test navigator tab or select the
 MatrixSDKTests scheme and click on the "Test" action.
-
-Test Plans
-----------
-We have test plans for the macOS target to run tests separately or with different configurations.
-
-AllTests
-  Default test plan to run all tests.
-
-AllTestsWithSanitizers
-  Run all tests with 2 configurations: "ASan + UBSan" and "TSan + UBSan". "UBSan" for Unexpected Behavior Sanitizer. "ASan" for Address Sanitizier. "Tsan" for Thread Sanitizer. This setup was advised at WWDC2019 (https://developer.apple.com/videos/play/wwdc2019/413?time=2270). This test plan requires 2 builds and 2 test runs.
-
-UnitTests
-  Test plan for all unit tests.
-
-UnitTestsWithSanitizers
-  All unit tests with the 2 configurations described above: "ASan + UBSan" and "TSan + UBSan".
 
 Known issues
 ============
@@ -536,7 +501,38 @@ Known issues
 CocoaPods may fail to install on OSX 10.8.x with "i18n requires Ruby version
 >= 1.9.3.".  This is a known problem similar to
 https://github.com/CocoaPods/CocoaPods/issues/2458 that needs to be raised with
-the CocoaPods team.
+the cocoapods team.
+
+### Dynamic Framework: Undefined symbols for architecture
+
+If you are using "MatrixSDK" instead of "SwiftMatrixSDK", you may get a compile-
+time error that looks like this::
+
+    Undefined symbols for architecture x86_64:
+      "_OBJC_CLASS_$_GAIDictionaryBuilder", referenced from:
+          objc-class-ref in MXGoogleAnalytics.o
+      "_OBJC_CLASS_$_GAI", referenced from:
+          objc-class-ref in MXGoogleAnalytics.o
+    ld: symbol(s) not found for architecture x86_64
+    clang: error: linker command failed with exit code 1 (use -v to see invocation)
+
+This happens when both of the following are true:
+
+1. The MatrixSDK was compiled as a framework (i.e. the `use_frameworks!` setting
+is enabled in your podfile)
+2. Your project also uses the Google Analytics pod.
+
+The root cause is that the `MXGoogleAnalytics` class recognizes that the Google
+Analytics pod was included in your project, and attempts to include its headers.
+This type of behavior is allowed in a Static Library, but it is not allowed in a
+Dynamic Framework.
+
+The easiest workaround is to switch to the "SwiftMatrixSDK" pod, even if you
+don't use Swift (for an Obj-C project, the pods are virtually the same). The
+"SwiftMatrixSDK" excludes the `MXGoogleAnalytics` class. If you want to collect
+analytics data about initialization times (and so forth), you can implement your
+own `MXAnalyticsDelegate` and set an instance to `MXSDKOptions.sharedInstance`.
+See `MXAnalyticsDelegate.h` and `MXGoogleAnalytics.h/m` for more information.
 
 Registration
 ------------

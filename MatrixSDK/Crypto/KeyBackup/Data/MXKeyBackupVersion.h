@@ -27,12 +27,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  The algorithm used for storing backups.
- Currently, kMXCryptoCurve25519KeyBackupAlgorithm (m.megolm_backup.v1.curve25519-aes-sha2) and kMXCryptoAes256KeyBackupAlgorithm (org.matrix.msc3270.v1.aes-hmac-sha2) are defined.
+ Currently, only kMXCryptoMegolmBackupAlgorithm (m.megolm_backup.v1.curve25519-aes-sha2) is defined.
  */
 @property (nonatomic) NSString *algorithm;
 
 /**
- Algorithm-dependent auth data.
+ Algorithm-dependent data.
  */
 @property (nonatomic) NSDictionary *authData;
 

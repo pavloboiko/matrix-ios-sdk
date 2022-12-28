@@ -22,20 +22,21 @@
 
 #import <OLMKit/OLMKit.h>
 
-#import "MXTools.h"
 #import "MXCryptoTools.h"
-#import "MXRealmCryptoStore.h"
 
-#import "MXKeyProvider.h"
-#import "MXRawDataKey.h"
-#import "MXCryptoConstants.h"
-
-NSInteger const kMXInboundGroupSessionCacheSize = 100;
-
-@interface MXOlmDevice () <OLMKitPickleKeyDelegate>
+@interface MXOlmDevice ()
 {
+    // The OLMKit account instance.
+    OLMAccount *olmAccount;
+
     // The OLMKit utility instance.
     OLMUtility *olmUtility;
+
+    // The outbound group session.
+    // They are not stored in 'store' to avoid to remember to which devices we sent the session key.
+    // Plus, in cryptography, it is good to refresh sessions from time to time.
+    // The key is the session id, the value the outbound group session.
+    NSMutableDictionary<NSString*, OLMOutboundGroupSession*> *outboundGroupSessionStore;
 
     // Store a set of decrypted message indexes for each group session.
     // This partially mitigates a replay attack where a MITM resends a group
@@ -56,10 +57,8 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 // The store where crypto data is saved.
 @property (nonatomic, readonly) id<MXCryptoStore> store;
 
-// Cache to avoid refetching unchanged sessions from the crypto store
-@property (nonatomic, strong) MXLRUCache *inboundGroupSessionCache;
-
 @end
+
 
 @implementation MXOlmDevice
 @synthesize store;
@@ -70,41 +69,30 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
     if (self)
     {
         store = theStore;
-        
-        // It is up to the app to provide an encryption key that it safely manages.
-        // If provided, this key will be used as a global pickle key for all olm pickes.
-        // Else, libolm will create pickle keys internally.
-        if ([MXKeyProvider.sharedInstance hasKeyForDataOfType:MXCryptoOlmPickleKeyDataType isMandatory:NO])
-        {
-            MXLogDebug(@"[MXOlmDevice] initWithStore: Use a global pickle key for libolm");
-            OLMKit.sharedInstance.pickleKeyDelegate = self;
-        }
 
         // Retrieve the account from the store
-        OLMAccount *olmAccount = store.account;
+        olmAccount = [store account];
         if (!olmAccount)
         {
-            MXLogDebug(@"[MXOlmDevice] initWithStore: Create new OLMAccount");
+            NSLog(@"[MXOlmDevice] initWithStore: Create new OLMAccount");
 
             // Else, create it
-            // create a OLM account
             olmAccount = [[OLMAccount alloc] initNewAccount];
 
-            [store setAccount:olmAccount];
+            [store storeAccount:olmAccount];
         }
         else
         {
-            MXLogDebug(@"[MXOlmDevice] initWithStore: Reuse OLMAccount from store");
+            NSLog(@"[MXOlmDevice] initWithStore: Reuse OLMAccount from store");
         }
 
         olmUtility = [[OLMUtility alloc] init];
 
+        outboundGroupSessionStore = [NSMutableDictionary dictionary];
         inboundGroupSessionMessageIndexes = [NSMutableDictionary dictionary];
 
-        _deviceCurve25519Key = olmAccount.identityKeys[kMXKeyCurve25519Type];
-        _deviceEd25519Key = olmAccount.identityKeys[kMXKeyEd25519Type];
-
-        _inboundGroupSessionCache = [[MXLRUCache alloc] initWithCapacity:kMXInboundGroupSessionCacheSize];
+        _deviceCurve25519Key = olmAccount.identityKeys[@"curve25519"];
+        _deviceEd25519Key = olmAccount.identityKeys[@"ed25519"];
     }
     return self;
 }
@@ -116,7 +104,7 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 
 - (NSString *)signMessage:(NSData*)message
 {
-    return [store.account signMessage:message];
+    return [olmAccount signMessage:message];
 }
 
 - (NSString *)signJSON:(NSDictionary *)JSONDictinary
@@ -126,49 +114,37 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 
 - (NSDictionary *)oneTimeKeys
 {
-    return store.account.oneTimeKeys;
+    return olmAccount.oneTimeKeys;
 }
 
 - (NSUInteger)maxNumberOfOneTimeKeys
 {
-    return store.account.maxOneTimeKeys;
+    return olmAccount.maxOneTimeKeys;
 }
 
 - (void)markOneTimeKeysAsPublished
 {
-    [store performAccountOperationWithBlock:^(OLMAccount *olmAccount) {
-        [olmAccount markOneTimeKeysAsPublished];
-    }];
+    [olmAccount markOneTimeKeysAsPublished];
+
+    [store storeAccount:olmAccount];
 }
 
 - (void)generateOneTimeKeys:(NSUInteger)numKeys
 {
-    [store performAccountOperationWithBlock:^(OLMAccount *olmAccount) {
-        [olmAccount generateOneTimeKeys:numKeys];
-    }];
-}
+    [olmAccount generateOneTimeKeys:numKeys];
 
-- (NSDictionary *)fallbackKey
-{
-    return store.account.fallbackKey;
-}
-
-- (void)generateFallbackKey
-{
-    [store performAccountOperationWithBlock:^(OLMAccount *olmAccount) {
-        [olmAccount generateFallbackKey];
-    }];
+    [store storeAccount:olmAccount];
 }
 
 - (NSString *)createOutboundSession:(NSString *)theirIdentityKey theirOneTimeKey:(NSString *)theirOneTimeKey
 {
     NSError *error;
 
-    MXLogDebug(@"[MXOlmDevice] createOutboundSession: theirIdentityKey: %@. theirOneTimeKey: %@", theirIdentityKey, theirOneTimeKey);
+//    NSLog(@">>>> createOutboundSession: theirIdentityKey: %@ theirOneTimeKey: %@", theirIdentityKey, theirOneTimeKey);
 
-    OLMSession *olmSession = [[OLMSession alloc] initOutboundSessionWithAccount:store.account theirIdentityKey:theirIdentityKey theirOneTimeKey:theirOneTimeKey error:&error];
+    OLMSession *olmSession = [[OLMSession alloc] initOutboundSessionWithAccount:olmAccount theirIdentityKey:theirIdentityKey theirOneTimeKey:theirOneTimeKey error:&error];
 
-    MXLogDebug(@"[MXOlmDevice] createOutboundSession: Olm Session id: %@", olmSession.sessionIdentifier);
+//    NSLog(@">>>> olmSession.sessionIdentifier: %@", olmSession.sessionIdentifier);
 
     if (olmSession)
     {
@@ -184,7 +160,7 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
     }
     else if (error)
     {
-        MXLogDebug(@"[MXOlmDevice] createOutboundSession. Error: %@", error);
+        NSLog(@"[MXOlmDevice] createOutboundSession. Error: %@", error);
     }
 
     return nil;
@@ -192,45 +168,45 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 
 - (NSString*)createInboundSession:(NSString*)theirDeviceIdentityKey messageType:(NSUInteger)messageType cipherText:(NSString*)ciphertext payload:(NSString**)payload
 {
-    MXLogDebug(@"[MXOlmDevice] createInboundSession: theirIdentityKey: %@", theirDeviceIdentityKey);
+    NSError *error;
 
-    __block OLMSession *olmSession;
-    
-    [store performAccountOperationWithBlock:^(OLMAccount *olmAccount) {
-        NSError *error;
-        olmSession = [[OLMSession alloc] initInboundSessionWithAccount:olmAccount theirIdentityKey:theirDeviceIdentityKey oneTimeKeyMessage:ciphertext error:&error];
-        
-        MXLogDebug(@"[MXOlmDevice] createInboundSession: Olm Session id: %@", olmSession.sessionIdentifier);
-        
-        if (olmSession)
-        {
-            [olmAccount removeOneTimeKeysForSession:olmSession];
-        }
-        else if (error)
-        {
-            MXLogDebug(@"[MXOlmDevice] createInboundSession. Error: %@", error);
-        }
-    }];
-    
+//    NSLog(@"<<< createInboundSession: theirIdentityKey: %@", theirDeviceIdentityKey);
+
+    OLMSession *olmSession = [[OLMSession alloc] initInboundSessionWithAccount:olmAccount theirIdentityKey:theirDeviceIdentityKey oneTimeKeyMessage:ciphertext error:&error];
+
+//    NSLog(@"<<< olmSession.sessionIdentifier: %@", olmSession.sessionIdentifier);
+
     if (olmSession)
     {
-        NSError *error;
+        [olmAccount removeOneTimeKeysForSession:olmSession];
+        [store storeAccount:olmAccount];
+
+//        NSLog(@"<<< ciphertext: %@", ciphertext);
+//        NSLog(@"<<< ciphertext: SHA256: %@", [olmUtility sha256:[ciphertext dataUsingEncoding:NSUTF8StringEncoding]]);
+
         *payload = [olmSession decryptMessage:[[OLMMessage alloc] initWithCiphertext:ciphertext type:messageType] error:&error];
+
         if (error)
         {
-            MXLogDebug(@"[MXOlmDevice] createInboundSession. decryptMessage error: %@", error);
+            NSLog(@"[MXOlmDevice] createInboundSession. decryptMessage error: %@", error);
         }
-        
+
         MXOlmSession *mxOlmSession = [[MXOlmSession alloc] initWithOlmSession:olmSession];
-        
+
         // This counts as a received message: set last received message time
         // to now
         [mxOlmSession didReceiveMessage];
-        
+
         [store storeSession:mxOlmSession forDevice:theirDeviceIdentityKey];
+
+        return olmSession.sessionIdentifier;
+    }
+    else if (error)
+    {
+        NSLog(@"[MXOlmDevice] createInboundSession. Error: %@", error);
     }
 
-    return olmSession.sessionIdentifier;
+    return nil;
 }
 
 - (NSArray<NSString *> *)sessionIdsForDevice:(NSString *)theirDeviceIdentityKey
@@ -240,10 +216,7 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
     NSMutableArray *sessionIds = [NSMutableArray arrayWithCapacity:sessions.count];
     for (MXOlmSession *session in sessions)
     {
-        if (session.session.sessionIdentifier)
-        {
-            [sessionIds addObject:session.session.sessionIdentifier];
-        }
+        [sessionIds addObject:session.session.sessionIdentifier];
     }
 
     return sessionIds;
@@ -258,50 +231,53 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 
 - (NSDictionary *)encryptMessage:(NSString *)theirDeviceIdentityKey sessionId:(NSString *)sessionId payloadString:(NSString *)payloadString
 {
-    __block OLMMessage *olmMessage;
+    NSError *error;
+    OLMMessage *olmMessage;
 
-    MXLogDebug(@"[MXOlmDevice] encryptMessage: Olm Session id %@ to %@", sessionId, theirDeviceIdentityKey);
-    
-    [store performSessionOperationWithDevice:theirDeviceIdentityKey andSessionId:sessionId block:^(MXOlmSession *mxOlmSession) {
-        
-        if (mxOlmSession.session)
+    MXOlmSession *mxOlmSession = [self sessionForDevice:theirDeviceIdentityKey andSessionId:sessionId];
+
+//    NSLog(@">>>> encryptMessage: olmSession.sessionIdentifier: %@", olmSession.sessionIdentifier);
+//    NSLog(@">>>> payloadString: %@", payloadString);
+
+    if (mxOlmSession.session)
+    {
+        olmMessage = [mxOlmSession.session encryptMessage:payloadString error:&error];
+
+        if (error)
         {
-            NSError *error;
-            olmMessage = [mxOlmSession.session encryptMessage:payloadString error:&error];
-            
-            if (error)
-            {
-                MXLogDebug(@"[MXOlmDevice] encryptMessage failed for session id %@ and sender %@: %@", sessionId, theirDeviceIdentityKey, error);
-            }
+            NSLog(@"[MXOlmDevice] encryptMessage failed for session id %@ and sender %@: %@", sessionId, theirDeviceIdentityKey, error);
         }
-    }];
-    
+
+        [store storeSession:mxOlmSession forDevice:theirDeviceIdentityKey];
+    }
+
+    //NSLog(@">>>> ciphertext: %@", olmMessage.ciphertext);
+    //NSLog(@">>>> ciphertext: SHA256: %@", [olmUtility sha256:[olmMessage.ciphertext dataUsingEncoding:NSUTF8StringEncoding]]);
+
     return @{
-        kMXMessageBodyKey: olmMessage.ciphertext,
-        @"type": @(olmMessage.type)
-    };
+             @"body": olmMessage.ciphertext,
+             @"type": @(olmMessage.type)
+             };
 }
 
 - (NSString*)decryptMessage:(NSString*)ciphertext withType:(NSUInteger)messageType sessionId:(NSString*)sessionId theirDeviceIdentityKey:(NSString*)theirDeviceIdentityKey
 {
-    __block NSString *payloadString;
-    
-    MXLogDebug(@"[MXOlmDevice] decryptMessage: Olm Session id %@(%@) from %@" ,sessionId, @(messageType), theirDeviceIdentityKey);
-    
-    [store performSessionOperationWithDevice:theirDeviceIdentityKey andSessionId:sessionId block:^(MXOlmSession *mxOlmSession) {
-        if (mxOlmSession)
+    NSError *error;
+    NSString *payloadString;
+
+    MXOlmSession *mxOlmSession = [self sessionForDevice:theirDeviceIdentityKey andSessionId:sessionId];
+    if (mxOlmSession)
+    {
+        payloadString = [mxOlmSession.session decryptMessage:[[OLMMessage alloc] initWithCiphertext:ciphertext type:messageType] error:&error];
+
+        if (error)
         {
-            NSError *error;
-            payloadString = [mxOlmSession.session decryptMessage:[[OLMMessage alloc] initWithCiphertext:ciphertext type:messageType] error:&error];
-            
-            if (error)
-            {
-                MXLogDebug(@"[MXOlmDevice] decryptMessage. Error: %@", error);
-            }
-            
-            [mxOlmSession didReceiveMessage];
+            NSLog(@"[MXOlmDevice] decryptMessage failed for session id %@(%@) and sender %@: %@", sessionId, @(messageType), theirDeviceIdentityKey, error);
         }
-    }];
+
+        [mxOlmSession didReceiveMessage];
+        [store storeSession:mxOlmSession forDevice:theirDeviceIdentityKey];
+    }
 
     return payloadString;
 }
@@ -313,47 +289,46 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
         return NO;
     }
 
-    MXOlmSession *mxOlmSession = [store sessionWithDevice:theirDeviceIdentityKey andSessionId:sessionId];
+    MXOlmSession *mxOlmSession = [self sessionForDevice:theirDeviceIdentityKey andSessionId:sessionId];
     return [mxOlmSession.session matchesInboundSession:ciphertext];
 }
 
 
 #pragma mark - Outbound group session
-
-- (MXOlmOutboundGroupSession *)createOutboundGroupSessionForRoomWithRoomId:(NSString *)roomId
+- (NSString *)createOutboundGroupSession
 {
     OLMOutboundGroupSession *session = [[OLMOutboundGroupSession alloc] initOutboundGroupSession];
-    return [store storeOutboundGroupSession:session withRoomId:roomId];
+    outboundGroupSessionStore[session.sessionIdentifier] = session;
+
+    return session.sessionIdentifier;
 }
 
-- (void)storeOutboundGroupSession:(MXOlmOutboundGroupSession *)session
+- (NSString *)sessionKeyForOutboundGroupSession:(NSString *)sessionId
 {
-    MXLogDebug(@"[MXOlmDevice] storing Outbound Group Session For Room With ID %@", session.roomId);
-    [store storeOutboundGroupSession:session.session withRoomId:session.roomId];
+    return outboundGroupSessionStore[sessionId].sessionKey;
 }
 
-- (MXOlmOutboundGroupSession *)outboundGroupSessionForRoomWithRoomId:(NSString *)roomId
+- (NSUInteger)messageIndexForOutboundGroupSession:(NSString *)sessionId
 {
-    return [store outboundGroupSessionWithRoomId:roomId];
+    return outboundGroupSessionStore[sessionId].messageIndex;
 }
 
-- (void)discardOutboundGroupSessionForRoomWithRoomId:(NSString *)roomId
+- (NSString *)encryptGroupMessage:(NSString *)sessionId payloadString:(NSString *)payloadString
 {
-    [store removeOutboundGroupSessionWithRoomId:roomId];
+    return [outboundGroupSessionStore[sessionId] encryptMessage:payloadString error:nil];
 }
 
 
 #pragma mark - Inbound group session
-- (BOOL)addInboundGroupSession:(NSString*)sessionId
-                    sessionKey:(NSString*)sessionKey
+- (BOOL)addInboundGroupSession:(NSString*)sessionId sessionKey:(NSString*)sessionKey
                         roomId:(NSString*)roomId
                      senderKey:(NSString*)senderKey
   forwardingCurve25519KeyChain:(NSArray<NSString *> *)forwardingCurve25519KeyChain
                    keysClaimed:(NSDictionary<NSString*, NSString*>*)keysClaimed
                   exportFormat:(BOOL)exportFormat
-                 sharedHistory:(BOOL)sharedHistory
-                     untrusted:(BOOL)untrusted
 {
+    NSError *error;
+
     MXOlmInboundGroupSession *session;
     if (exportFormat)
     {
@@ -364,46 +339,25 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
         session = [[MXOlmInboundGroupSession alloc] initWithSessionKey:sessionKey];
     }
 
-    MXOlmInboundGroupSession *existingSession = [store inboundGroupSessionWithId:sessionId andSenderKey:senderKey];
-    if ([self checkInboundGroupSession:existingSession roomId:roomId])
-    {
-        existingSession = nil;
-    }
-    
+    MXOlmInboundGroupSession *existingSession = [self inboundGroupSessionWithId:sessionId senderKey:senderKey roomId:roomId error:&error];
     if (existingSession)
     {
         // If we already have this session, consider updating it
-        MXLogDebug(@"[MXOlmDevice] addInboundGroupSession: Considering updates for megolm session %@|%@", senderKey, sessionId);
+        NSLog(@"[MXOlmDevice] addInboundGroupSession: Update for megolm session %@|%@", senderKey, sessionId);
 
-        BOOL isExistingSessionBetter = existingSession.session.firstKnownIndex <= session.session.firstKnownIndex;
-        if (isExistingSessionBetter)
+        // If our existing session is better, we keep it
+        if (existingSession.session.firstKnownIndex <= session.session.firstKnownIndex)
         {
-            BOOL isNewSessionSafer = existingSession.isUntrusted && !session.isUntrusted;
-            if (!isNewSessionSafer)
-            {
-                MXLogDebug(@"[MXOlmDevice] addInboundGroupSession: Skip it. The index of the incoming session is higher (%@ vs %@)", @(session.session.firstKnownIndex), @(existingSession.session.firstKnownIndex));
-                return NO;
-            }
-            
-            if ([self connectsSession1:existingSession session2:session])
-            {
-                MXLogDebug(@"[MXOlmDevice] addInboundGroupSession: Skipping new session, and upgrading the safety of existing session");
-                [self upgradeSafetyForSession:existingSession];
-                return NO;
-            }
-            else
-            {
-                MXLogWarning(@"[MXOlmDevice] addInboundGroupSession: Recieved a safer but disconnected key, which will override the existing unsafe key");
-                existingSession = nil;
-            }
+            NSLog(@"[MXOlmDevice] addInboundGroupSession: Skip it. The index of the incoming session is higher (%@ vs %@)", @(session.session.firstKnownIndex), @(existingSession.session.firstKnownIndex));
+            return NO;
         }
     }
 
-    MXLogDebug(@"[MXOlmDevice] addInboundGroupSession: Add megolm session %@|%@ (import: %@)", senderKey, sessionId, exportFormat ? @"YES" : @"NO");
+    NSLog(@"[MXOlmDevice] addInboundGroupSession: Add megolm session %@|%@ (import: %@)", senderKey, sessionId, exportFormat ? @"YES" : @"NO");
 
     if (![session.session.sessionIdentifier isEqualToString:sessionId])
     {
-        MXLogDebug(@"[MXOlmDevice] addInboundGroupSession: ERROR: Mismatched group session ID from senderKey: %@", senderKey);
+        NSLog(@"[MXOlmDevice] addInboundGroupSession: ERROR: Mismatched group session ID from senderKey: %@", senderKey);
         return NO;
     }
 
@@ -411,38 +365,10 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
     session.roomId = roomId;
     session.keysClaimed = keysClaimed;
     session.forwardingCurve25519KeyChain = forwardingCurve25519KeyChain;
-    session.untrusted = untrusted;
-    
-    // If we already have a session stored, the sharedHistory flag will not be overwritten
-    if (!existingSession && MXSDKOptions.sharedInstance.enableRoomSharedHistoryOnInvite)
-    {
-        session.sharedHistory = sharedHistory;
-    }
 
-    [self storeInboundGroupSessions:@[session]];
+    [store storeInboundGroupSessions:@[session]];
 
     return YES;
-}
-
-- (void)upgradeSafetyForSession:(MXOlmInboundGroupSession *)session
-{
-    [self.store performSessionOperationWithGroupSessionWithId:session.session.sessionIdentifier senderKey:session.senderKey block:^(MXOlmInboundGroupSession *inboundGroupSession) {
-        inboundGroupSession.untrusted = NO;
-    }];
-    @synchronized (self.inboundGroupSessionCache)
-    {
-        session.untrusted = NO;
-        [self.inboundGroupSessionCache put:session.session.sessionIdentifier object:session];
-    }
-}
-
-- (BOOL)connectsSession1:(MXOlmInboundGroupSession *)session1 session2:(MXOlmInboundGroupSession *)session2
-{
-    // `connects` function will be moved to libolm in the future to avoid having to export the session
-    NSUInteger lowestCommonIndex = MAX(session1.session.firstKnownIndex, session2.session.firstKnownIndex);
-    MXMegolmSessionData *export1 = [session1 exportSessionDataAtMessageIndex:lowestCommonIndex];
-    MXMegolmSessionData *export2 = [session2 exportSessionDataAtMessageIndex:lowestCommonIndex];
-    return [export1.sessionKey isEqualToString:export2.sessionKey];
 }
 
 - (NSArray<MXOlmInboundGroupSession *>*)importInboundGroupSessions:(NSArray<MXMegolmSessionData *>*)inboundGroupSessionsData;
@@ -453,137 +379,94 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
     {
         if (!sessionData.roomId || !sessionData.algorithm)
         {
-            MXLogDebug(@"[MXOlmDevice] importInboundGroupSessions: ignoring session entry with missing fields: %@", sessionData);
+            NSLog(@"[MXOlmDevice] importInboundGroupSessions: ignoring session entry with missing fields: %@", sessionData);
             continue;
         }
 
         MXOlmInboundGroupSession *session = [[MXOlmInboundGroupSession alloc] initWithImportedSessionData:sessionData];
 
-        MXOlmInboundGroupSession *existingSession = [store inboundGroupSessionWithId:sessionData.sessionId andSenderKey:sessionData.senderKey];
-        if ([self checkInboundGroupSession:existingSession roomId:sessionData.roomId])
-        {
-            existingSession = nil;
-        }
-        
+        NSError *error;
+        MXOlmInboundGroupSession *existingSession = [self inboundGroupSessionWithId:sessionData.sessionId senderKey:sessionData.senderKey roomId:sessionData.roomId error:&error];
         if (existingSession)
         {
             // If we already have this session, consider updating it
-            MXLogDebug(@"[MXOlmDevice] importInboundGroupSessions: Update for megolm session %@|%@", sessionData.senderKey, sessionData.sessionId);
+            NSLog(@"[MXOlmDevice] importInboundGroupSessions: Update for megolm session %@|%@", sessionData.senderKey, sessionData.sessionId);
 
             // If our existing session is better, we keep it
             if (existingSession.session.firstKnownIndex <= session.session.firstKnownIndex)
             {
-                MXLogDebug(@"[MXOlmDevice] importInboundGroupSessions: Skip it. The index of the incoming session is higher (%@ vs %@)", @(session.session.firstKnownIndex), @(existingSession.session.firstKnownIndex));
+                NSLog(@"[MXOlmDevice] importInboundGroupSessions: Skip it. The index of the incoming session is higher (%@ vs %@)", @(session.session.firstKnownIndex), @(existingSession.session.firstKnownIndex));
                 continue;
-            }
-            
-            if (existingSession.sharedHistory != session.sharedHistory)
-            {
-                MXLogDebug(@"[MXOlmDevice] importInboundGroupSessions: Existing value of sharedHistory = %d is not allowed to be overriden by the updated session", existingSession.sharedHistory);
-                session.sharedHistory = existingSession.sharedHistory;
             }
         }
 
         [sessions addObject:session];
     }
 
-    [self storeInboundGroupSessions:sessions];
+    [store storeInboundGroupSessions:sessions];
 
     return sessions;
 }
 
-- (MXDecryptionResult *)decryptGroupMessage:(NSString *)body
-                                isEditEvent:(BOOL)isEditEvent
-                                     roomId:(NSString *)roomId
+- (MXDecryptionResult *)decryptGroupMessage:(NSString *)body roomId:(NSString *)roomId
                                  inTimeline:(NSString *)timeline
-                                  sessionId:(NSString *)sessionId
-                                  senderKey:(NSString *)senderKey
+                                  sessionId:(NSString *)sessionId senderKey:(NSString *)senderKey
                                       error:(NSError *__autoreleasing *)error
 {
-    __block NSUInteger messageIndex;
-    __block NSString *payloadString;
-    __block NSDictionary *keysClaimed;
-    __block NSArray<NSString *> *forwardingCurve25519KeyChain;
-    __block BOOL untrusted;
-    
     MXDecryptionResult *result;
-    
-    [self performGroupSessionOperationWithSessionId:sessionId senderKey:senderKey block:^(MXOlmInboundGroupSession *session) {
-        
-        *error = [self checkInboundGroupSession:session roomId:roomId];
-        if (*error)
-        {
-            MXLogDebug(@"[MXOlmDevice] decryptGroupMessage: Cannot decrypt in room %@ with session %@|%@. Error: %@", roomId, senderKey, sessionId, *error);
-            session = nil;
-        }
-        else
-        {
-            payloadString = [session.session decryptMessage:body messageIndex:&messageIndex error:error];
-            keysClaimed = session.keysClaimed;
-            forwardingCurve25519KeyChain = session.forwardingCurve25519KeyChain;
-            untrusted = session.isUntrusted;
-        }
-        
-    }];
 
-    if (payloadString)
+    MXOlmInboundGroupSession *session = [self inboundGroupSessionWithId:sessionId senderKey:senderKey roomId:roomId error:error];
+    if (session)
     {
-        // Check if we have seen this message index before to detect replay attacks.
-        if (timeline)
+        NSUInteger messageIndex;
+        NSString *payloadString = [session.session decryptMessage:body messageIndex:&messageIndex error:error];
+
+        [store storeInboundGroupSessions:@[session]];
+
+        if (payloadString)
         {
-            if (!inboundGroupSessionMessageIndexes[timeline])
+            // Check if we have seen this message index before to detect replay attacks.
+            if (timeline)
             {
-                inboundGroupSessionMessageIndexes[timeline] = [NSMutableDictionary dictionary];
-            }
-            
-            NSString *messageIndexKey = [NSString stringWithFormat:@"%@|%@|%tu|%d", senderKey, sessionId, messageIndex, isEditEvent];
-            if (inboundGroupSessionMessageIndexes[timeline][messageIndexKey])
-            {
-                MXLogDebug(@"[MXOlmDevice] decryptGroupMessage: Warning: Possible replay attack %@", messageIndexKey);
-                
-                if (error)
+                if (!inboundGroupSessionMessageIndexes[timeline])
                 {
-                    *error = [NSError errorWithDomain:MXDecryptingErrorDomain
-                                                 code:MXDecryptingErrorDuplicateMessageIndexCode
-                                             userInfo:@{
-                                                 NSLocalizedDescriptionKey: [NSString stringWithFormat:MXDecryptingErrorDuplicateMessageIndexReason, messageIndexKey]
-                                             }];
+                    inboundGroupSessionMessageIndexes[timeline] = [NSMutableDictionary dictionary];
                 }
-                
-                return nil;
+
+                NSString *messageIndexKey = [NSString stringWithFormat:@"%@|%@|%tu", senderKey, sessionId, messageIndex];
+                if (inboundGroupSessionMessageIndexes[timeline][messageIndexKey])
+                {
+                    NSLog(@"[MXOlmDevice] decryptGroupMessage: Warning: Possible replay attack %@", messageIndexKey);
+
+                    if (error)
+                    {
+                        *error = [NSError errorWithDomain:MXDecryptingErrorDomain
+                                                     code:MXDecryptingErrorDuplicateMessageIndexCode
+                                                 userInfo:@{
+                                                            NSLocalizedDescriptionKey: [NSString stringWithFormat:MXDecryptingErrorDuplicateMessageIndexReason, messageIndexKey]
+                                                            }];
+                    }
+
+                    return nil;
+                }
+
+                inboundGroupSessionMessageIndexes[timeline][messageIndexKey] = @(YES);
             }
-            
-            inboundGroupSessionMessageIndexes[timeline][messageIndexKey] = @(YES);
+
+            result = [[MXDecryptionResult alloc] init];
+            result.payload = [NSJSONSerialization JSONObjectWithData:[payloadString dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+            result.keysClaimed = session.keysClaimed;
+            result.senderKey = senderKey;
+            result.forwardingCurve25519KeyChain = session.forwardingCurve25519KeyChain;
         }
-        
-        result = [[MXDecryptionResult alloc] init];
-        result.payload = [NSJSONSerialization JSONObjectWithData:[payloadString dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-        result.keysClaimed = keysClaimed;
-        result.senderKey = senderKey;
-        result.forwardingCurve25519KeyChain = forwardingCurve25519KeyChain;
-        result.untrusted = untrusted;
+    }
+
+    if (*error)
+    {
+        NSLog(@"[MXOlmDevice] decryptGroupMessage: Cannot decrypt in room %@ with session %@|%@. Error: %@", roomId, senderKey, sessionId, *error);
     }
 
     return result;
-}
-
-- (void)performGroupSessionOperationWithSessionId:(NSString*)sessionId senderKey:(NSString*)senderKey block:(void (^)(MXOlmInboundGroupSession *inboundGroupSession))block
-{
-    StopDurationTracking stopTracking = [MXSDKOptions.sharedInstance.analyticsDelegate startDurationTrackingForName:@"MXOlmDevice" operation:@"megolm.decrypt.cache"];
-    @synchronized (self.inboundGroupSessionCache)
-    {
-        MXOlmInboundGroupSession *session = (MXOlmInboundGroupSession *)[self.inboundGroupSessionCache get:sessionId];
-        if (!session)
-        {
-            session = [store inboundGroupSessionWithId:sessionId andSenderKey:senderKey];
-            [self.inboundGroupSessionCache put:sessionId object:session];
-        }
-        block(session);
-    }
-    if (stopTracking)
-    {
-        stopTracking();
-    }
 }
 
 - (void)resetReplayAttackCheckInTimeline:(NSString*)timeline
@@ -592,41 +475,52 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 }
 
 /**
- Check an InboundGroupSession
+ Extract an InboundGroupSession from the session store and do some check.
 
- @paral session the session to check.
  @param roomId the room where the sesion is used.
- @return an error if there is an issue.
+ @param sessionId the session identifier.
+ @param senderKey the base64-encoded curve25519 key of the sender.
+ @param error the result error if there is an issue.
+ @return the inbound group session.
  */
-- (NSError *)checkInboundGroupSession:(MXOlmInboundGroupSession *)session roomId:(NSString *)roomId
+- (MXOlmInboundGroupSession *)inboundGroupSessionWithId:(NSString *)sessionId senderKey:(NSString *)senderKey
+                                                 roomId:(NSString *)roomId
+                                                  error:(NSError *__autoreleasing *)error
 {
-    NSError *error;
+    MXOlmInboundGroupSession *session = [store inboundGroupSessionWithId:sessionId andSenderKey:senderKey];
+
     if (session)
     {
         // Check that the room id matches the original one for the session. This stops
         // the HS pretending a message was targeting a different room.
         if (![roomId isEqualToString:session.roomId])
         {
-            MXLogDebug(@"[MXOlmDevice] inboundGroupSessionWithId: ERROR: Mismatched room_id for inbound group session (expected %@, was %@)", roomId, session.roomId);
+            NSLog(@"[MXOlmDevice] inboundGroupSessionWithId: ERROR: Mismatched room_id for inbound group session (expected %@, was %@)", roomId, session.roomId);
 
             NSString *errorDescription = [NSString stringWithFormat:MXDecryptingErrorInboundSessionMismatchRoomIdReason, roomId, session.roomId];
 
-            error = [NSError errorWithDomain:MXDecryptingErrorDomain
+            if (error)
+            {
+                *error = [NSError errorWithDomain:MXDecryptingErrorDomain
                                              code:MXDecryptingErrorUnknownInboundSessionIdCode
                                          userInfo:@{
                                                     NSLocalizedDescriptionKey: errorDescription
                                                     }];
+            }
         }
     }
     else
     {
-        error = [NSError errorWithDomain:MXDecryptingErrorDomain
+        if (error)
+        {
+            *error = [NSError errorWithDomain:MXDecryptingErrorDomain
                                          code:MXDecryptingErrorUnknownInboundSessionIdCode
                                      userInfo:@{
                                                 NSLocalizedDescriptionKey: MXDecryptingErrorUnknownInboundSessionIdReason
                                                 }];
+        }
     }
-    return error;
+    return session;
 }
 
 - (BOOL)hasInboundSessionKeys:(NSString*)roomId senderKey:(NSString*)senderKey sessionId:(NSString*)sessionId
@@ -640,7 +534,7 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 
     if (![session.roomId isEqualToString:roomId])
     {
-        MXLogDebug(@"[MXOlmDevice] hasInboundSessionKeys: requested keys for inbound group session %@|%@`, with incorrect room_id (expected %@, was %@)", senderKey, sessionId, session.roomId, roomId);
+        NSLog(@"[MXOlmDevice] hasInboundSessionKeys: requested keys for inbound group session %@|%@`, with incorrect room_id (expected %@, was %@)", senderKey, sessionId, session.roomId, roomId);
 
         return NO;
     }
@@ -651,15 +545,9 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 - (NSDictionary*)getInboundGroupSessionKey:(NSString*)roomId senderKey:(NSString*)senderKey sessionId:(NSString*)sessionId chainIndex:(NSNumber*)chainIndex
 {
     NSDictionary *inboundGroupSessionKey;
-    
-    MXOlmInboundGroupSession *session = [store inboundGroupSessionWithId:sessionId andSenderKey:senderKey];
-    NSError *error = [self checkInboundGroupSession:session roomId:roomId];
-    if (error)
-    {
-        MXLogDebug(@"[MXOlmDevice] getInboundGroupSessionKey in room %@ with session %@|%@. Error: %@", roomId, senderKey, sessionId, error);
-        session = nil;
-    }
-    
+
+    NSError *error;
+    MXOlmInboundGroupSession *session = [self inboundGroupSessionWithId:sessionId senderKey:senderKey roomId:roomId error:&error];
     if (session)
     {
         NSNumber *messageIndex = chainIndex;
@@ -673,45 +561,21 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 
         MXMegolmSessionData *sessionData = [session exportSessionDataAtMessageIndex:[messageIndex unsignedIntegerValue]];
         NSArray<NSString*> *forwardingCurve25519KeyChain = sessionData.forwardingCurve25519KeyChain;
-        BOOL sharedHistory = MXSDKOptions.sharedInstance.enableRoomSharedHistoryOnInvite && sessionData.sharedHistory;
 
         inboundGroupSessionKey = @{
                                    @"chain_index": messageIndex,
                                    @"key": sessionData.sessionKey,
                                    @"forwarding_curve25519_key_chain": forwardingCurve25519KeyChain ? forwardingCurve25519KeyChain : @[],
-                                   @"sender_claimed_ed25519_key": senderEd25519Key ? senderEd25519Key : [NSNull null],
-                                   @"shared_history": @(sharedHistory)
+                                   @"sender_claimed_ed25519_key": senderEd25519Key ? senderEd25519Key : [NSNull null]
                                    };
     }
 
+    if (error)
+    {
+        NSLog(@"[MXOlmDevice] getInboundGroupSessionKey in room %@ with session %@|%@. Error: %@", roomId, senderKey, sessionId, error);
+    }
+
     return inboundGroupSessionKey;
-}
-
-- (void)storeInboundGroupSessions:(NSArray <MXOlmInboundGroupSession *>*)sessions
-{
-    [store storeInboundGroupSessions:sessions];
-    @synchronized (self.inboundGroupSessionCache)
-    {
-        for (MXOlmInboundGroupSession *session in sessions)
-        {
-            [self.inboundGroupSessionCache put:session.session.sessionIdentifier object:session];
-        }
-    }
-}
-
-
-#pragma mark - OLMKitPickleKeyDelegate
-
-- (NSData *)pickleKey
-{
-    // If this delegate is called, we must have a key to provide
-    MXKeyData *keyData = [[MXKeyProvider sharedInstance] keyDataForDataOfType:MXCryptoOlmPickleKeyDataType isMandatory:YES expectedKeyType:kRawData];
-    if (keyData && [keyData isKindOfClass:[MXRawDataKey class]])
-    {
-        return ((MXRawDataKey *)keyData).key;
-    }
-    
-    return nil;
 }
 
 
@@ -729,6 +593,13 @@ NSInteger const kMXInboundGroupSessionCacheSize = 100;
 - (NSString *)sha256:(NSString *)message
 {
     return [olmUtility sha256:[message dataUsingEncoding:NSUTF8StringEncoding]];
+}
+
+
+#pragma mark - Private methods
+- (MXOlmSession*)sessionForDevice:(NSString *)theirDeviceIdentityKey andSessionId:(NSString*)sessionId
+{
+    return [store sessionWithDevice:theirDeviceIdentityKey andSessionId:sessionId];
 }
 
 @end

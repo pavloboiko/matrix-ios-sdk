@@ -33,14 +33,12 @@
 
 #import "MXCrypto.h"
 
-@class MXRoomKeyInfo;
-
 /**
  The `MXCrypto_Private` extension exposes internal operations.
  
  These methods run on a dedicated thread and must be called with the corresponding care.
  */
-@interface MXLegacyCrypto ()
+@interface MXCrypto ()
 
 /**
  The store for crypto data.
@@ -163,32 +161,6 @@
 - (NSDictionary*)signObject:(NSDictionary*)object;
 
 
-#pragma mark - One Time keys
-
-/**
- Retrieve the number of one time keys published on the homeserver.
-
- @param success A block object called when the operation succeeds.
-                It provides the number of OTKs.
- @param failure A block object called when the operation fails.
- */
-- (MXHTTPOperation *)publishedOneTimeKeysCount:(void (^)(NSUInteger publishedKeyCount))success
-                                       failure:(void (^)(NSError *))failure;
-
-/**
- Generate and publish enough one time keys on the homeserver.
- 
- @param keyCount the number of keys currently available on the homeserver.
- @param retry YES to retry in case of server error.
- @param success A block object called when the operation succeeds.
- @param failure A block object called when the operation fails.
- */
-- (MXHTTPOperation *)generateAndUploadOneTimeKeys:(NSUInteger)keyCount
-                                            retry:(BOOL)retry
-                                          success:(void (^)(void))success
-                                          failure:(void (^)(NSError *))failure;
-
-
 #pragma mark - import/export
 
 /**
@@ -225,15 +197,6 @@
 
 // Create a message to forward a megolm session
 - (NSDictionary*)buildMegolmKeyForwardingMessage:(NSString*)roomId senderKey:(NSString*)senderKey sessionId:(NSString*)sessionId chainIndex:(NSNumber*)chainIndex;
-
-/**
- Handle forwarded room key that was not requested by this device
- 
- @param keyInfo details about the key
- @param senderId userId of the person who sent us the key
- @param senderKey identity of the person who sent us the room key
- */
-- (void)handleUnrequestedRoomKeyInfo:(MXRoomKeyInfo *)keyInfo senderId:(NSString *)senderId senderKey:(NSString *)senderKey;
 
 @end
 

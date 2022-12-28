@@ -149,11 +149,6 @@
                 [cachedObjects addObject:item];
                 [cachedKeys addObject:key];
             }
-            else
-            {
-                MXLRUCacheItem* item = [cachedObjects objectAtIndex:pos];
-                item.object = object;
-            }
         }
     }
 }

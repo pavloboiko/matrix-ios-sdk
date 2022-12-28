@@ -15,6 +15,7 @@
  */
 
 #import "MXAggregationPaginatedResponse.h"
+#import "MXAggregationPaginatedResponse_Private.h"
 
 @implementation MXAggregationPaginatedResponse
 

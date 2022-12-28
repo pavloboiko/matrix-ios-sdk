@@ -16,8 +16,6 @@
 
 
 #import "MXRoomCreationParameters.h"
-#import "MXRoomCreateContent.h"
-#import "MatrixSDKSwiftHeader.h"
 
 @implementation MXRoomCreationParameters
 
@@ -37,20 +35,6 @@
                                          @"is_direct": [NSNumber numberWithBool:_isDirect]
                                          } mutableCopy];
 
-    NSMutableDictionary *createContentDictionary;
-    
-    if (_creationContent)
-    {
-        createContentDictionary = [_creationContent mutableCopy];
-    }
-    else
-    {
-        createContentDictionary = [NSMutableDictionary new];
-    }    
-    if (_roomType)
-    {
-        createContentDictionary[MXRoomCreateContentRoomTypeJSONKey] = _roomType;
-    }
     if (_name)
     {
         dictionary[@"name"] = _name;
@@ -95,67 +79,10 @@
     {
         dictionary[@"initial_state"] = _initialStateEvents;
     }
-    if (createContentDictionary.count)
-    {
-        dictionary[@"creation_content"] = createContentDictionary;
-    }
-    if (_powerLevelContentOverride)
-    {
-        dictionary[@"power_level_content_override"] = [_powerLevelContentOverride JSONDictionary];
-    }
-    if (_roomVersion)
-    {
-        dictionary[@"room_version"] = _roomVersion;
-    }
-    
+
     return dictionary;
 }
 
-- (void)addOrUpdateInitialStateEvent:(NSDictionary*)stateEvent
-{
-    if (!self.initialStateEvents)
-    {
-        self.initialStateEvents = @[];
-    }
-    
-    NSString *stateEventTypeString;
-    
-    MXJSONModelSetString(stateEventTypeString, stateEvent[@"type"]);
-    
-    if (!stateEventTypeString)
-    {
-        return;
-    }
-    
-    NSInteger existingStateEventIndex = [self indexForStateEventTypeString:stateEventTypeString];
-    
-    NSMutableArray *initialStateEvents = [self.initialStateEvents mutableCopy];
-    
-    if (existingStateEventIndex != NSNotFound)
-    {
-        initialStateEvents[existingStateEventIndex] = stateEvent;
-    }
-    else
-    {
-        [initialStateEvents addObject:stateEvent];
-    }
-    
-    self.initialStateEvents = initialStateEvents;
-}
-
-#pragma mark - Private
-
-- (NSInteger)indexForStateEventTypeString:(NSString*)eventTypeString
-{
-    return [self.initialStateEvents indexOfObjectPassingTest:^BOOL(NSDictionary * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
-        if ([obj[@"type"] isEqualToString:eventTypeString])
-        {
-            *stop = YES;
-            return YES;
-        }
-        return NO;
-    }];
-}
 
 #pragma mark - Factory
 
@@ -171,18 +98,13 @@
 
 + (NSDictionary *)initialStateEventForEncryptionWithAlgorithm:(NSString *)algorithm
 {
-    // Do not break the API for the moment
-    MXRoomInitialStateEventBuilder *stateEventBuilder = [MXRoomInitialStateEventBuilder new];
-    return [stateEventBuilder buildAlgorithmEventWithAlgorithm:algorithm];
-}
-
-+ (NSDictionary *)creationContentForVirtualRoomWithNativeRoomId:(NSString *)roomId
-{
     return @{
-        kRoomIsVirtualJSONKey: @{
-                kRoomNativeRoomIdJSONKey : roomId
-        }
-    };
+             @"type": @"m.room.encryption",
+             @"state_key": @"",
+             @"content": @{
+                     @"algorithm": algorithm
+                     }
+             };
 }
 
 @end

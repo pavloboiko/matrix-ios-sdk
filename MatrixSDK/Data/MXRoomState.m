@@ -77,9 +77,7 @@
         
         stateEvents = [NSMutableDictionary dictionary];
         _members = [[MXRoomMembers alloc] initWithRoomState:self andMatrixSession:mxSession];
-        _membersCount = [[MXRoomMembersCount alloc] initWithMembers:_members.members.count
-                                                             joined:_members.joinedMembers.count
-                                                            invited:[_members membersWithMembership:MXMembershipInvite].count];
+        _membersCount = [MXRoomMembersCount new];
         roomAliases = [NSMutableDictionary dictionary];
         thirdPartyInvites = [NSMutableDictionary dictionary];
         membersWithThirdPartyInviteTokenCache = [NSMutableDictionary dictionary];
@@ -112,38 +110,13 @@
                matrixSession:(MXSession *)matrixSession
                   onComplete:(void (^)(MXRoomState *roomState))onComplete
 {
-    NSString *logId = [NSUUID UUID].UUIDString;
-    MXLogDebug(@"[MXRoomState] loadRoomStateFromStore(%@): Loading state for room %@", logId, roomId)
-    
     MXRoomState *roomState = [[MXRoomState alloc] initWithRoomId:roomId andMatrixSession:matrixSession andDirection:YES];
     if (roomState)
     {
         [store stateOfRoom:roomId success:^(NSArray<MXEvent *> * _Nonnull stateEvents) {
-            if (!stateEvents.count) {
-                MXLogWarning(@"[MXRoomState] loadRoomStateFromStore(%@): No state events stored, loading from api", logId);
-                
-                [matrixSession.matrixRestClient stateOfRoom:roomId success:^(NSArray *JSONData) {
-                    NSArray<MXEvent *> *events = [MXEvent modelsFromJSON:JSONData];
-                    MXLogDebug(@"[MXRoomState] loadRoomStateFromStore(%@): Loaded %lu events from api", logId, events.count);
-                    
-                    [roomState handleStateEvents:events];
-                    onComplete(roomState);
-                } failure:^(NSError *error) {
-                    NSDictionary *details = @{
-                        @"log_id": logId ?: @"unknown",
-                        @"error": error ?: @"unknown"
-                    };
-                    MXLogErrorDetails(@"[MXRoomState] loadRoomStateFromStore: Failed to load any events from api", details);
-                    
-                    onComplete(roomState);
-                }];
-            } else {
-                MXLogDebug(@"[MXRoomState] loadRoomStateFromStore(%@): Initializing with %lu state events", logId, stateEvents.count);
-                
-                [roomState handleStateEvents:stateEvents];
-                onComplete(roomState);
-            }
+            [roomState handleStateEvents:stateEvents];
 
+            onComplete(roomState);
         } failure:nil];
     }
 }
@@ -154,7 +127,6 @@
     if (self)
     {
         _isLive = NO;
-        _members = [[MXRoomMembers alloc] initWithMembers:_members isLive:NO];
 
         // At the beginning of pagination, the back room state must be the same
         // as the current current room state.
@@ -248,17 +220,10 @@
         NSDictionary<NSString *, id> *eventContent = [self contentOfEvent:event];
         NSArray<NSString *> *aliasesBunch = eventContent[@"aliases"];
         
-        if ([aliasesBunch isKindOfClass:[NSArray class]] && aliasesBunch.count)
+        if (aliasesBunch.count)
         {
             [aliases addObjectsFromArray:aliasesBunch];
         }
-    }
-    
-    //  include canonicalAlias into aliases array
-    NSString *canonicalAlias = self.canonicalAlias;
-    if (canonicalAlias)
-    {
-        [aliases addObject:canonicalAlias];
     }
     
     return aliases.count ? aliases : nil;
@@ -320,23 +285,6 @@
     return avatar;
 }
 
-- (NSString *)creatorUserId
-{
-    NSString *creatorUserId;
-    
-    // Check it from the state events
-    MXEvent *event = [stateEvents objectForKey:kMXEventTypeStringRoomCreate].lastObject;
-    
-    NSDictionary<NSString *, id> *eventContent = [self contentOfEvent:event];
-    
-    if (event && eventContent)
-    {
-        MXJSONModelSetString(creatorUserId, eventContent[@"creator"]);
-        creatorUserId = [creatorUserId copy];
-    }
-    return creatorUserId;
-}
-
 - (MXRoomHistoryVisibility)historyVisibility
 {
     MXRoomHistoryVisibility historyVisibility = kMXRoomHistoryVisibilityShared;
@@ -386,7 +334,7 @@
 
 - (BOOL)isEncrypted
 {
-    return stateEvents[kMXEventTypeStringRoomEncryption] != nil;
+    return (0 != self.encryptionAlgorithm.length);
 }
 
 - (NSArray<NSString *> *)pinnedEvents
@@ -423,25 +371,6 @@
     }
     
     return roomTombStoneContent;
-}
-
-- (NSArray<MXBeaconInfo*>*)beaconInfos
-{
-    NSMutableArray *beaconInfoEvents = [NSMutableArray new];
-    
-    NSArray *stateEvents = [self stateEventsWithType:kMXEventTypeStringBeaconInfoMSC3672];
-    
-    for (MXEvent *event in stateEvents)
-    {
-        MXBeaconInfo *beaconInfo = [[MXBeaconInfo alloc] initWithMXEvent:event];
-        
-        if (beaconInfo)
-        {
-            [beaconInfoEvents addObject:beaconInfo];
-        }
-    }
-    
-    return beaconInfoEvents;
 }
 
 #pragma mark - State events handling
@@ -656,7 +585,7 @@
 
     stateCopy->_members = [_members copyWithZone:zone];
 
-    stateCopy->_membersCount = [_membersCount copyWithZone:zone];
+    stateCopy->_membersCount = _membersCount;
     
     stateCopy->roomAliases = [[NSMutableDictionary allocWithZone:zone] initWithDictionary:roomAliases];
 

@@ -59,7 +59,7 @@
 
     if (_methods.count == 0)
     {
-        MXLogDebug(@"[MXKeyVerification] Invalid MXKeyVerificationReady: %@", self);
+        NSLog(@"[MXKeyVerification] Invalid MXKeyVerificationReady: %@", self);
         isValid = NO;
     }
 

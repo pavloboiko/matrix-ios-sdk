@@ -18,7 +18,7 @@
 
 #import "MXKeyVerificationTransaction_Private.h"
 
-@class MXLegacyCrypto;
+@class MXCrypto;
 @class MXQRCodeData;
 
 NS_ASSUME_NONNULL_BEGIN
@@ -26,19 +26,19 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The `MXKeyBackup_Private` extension exposes internal operations.
  */
-@interface MXLegacyKeyVerificationManager ()
+@interface MXKeyVerificationManager ()
 
 /**
  The Matrix crypto.
  */
-@property (nonatomic, readonly, weak) MXLegacyCrypto *crypto;
+@property (nonatomic, readonly, weak) MXCrypto *crypto;
 
 /**
  Constructor.
 
  @param crypto the related 'MXCrypto'.
  */
-- (instancetype)initWithCrypto:(MXLegacyCrypto *)crypto;
+- (instancetype)initWithCrypto:(MXCrypto *)crypto;
 
 
 #pragma mark - Requests
@@ -55,7 +55,7 @@ NS_ASSUME_NONNULL_BEGIN
  
  @return a MXHTTPOperation instance.
  */
-- (MXHTTPOperation*)sendToOtherInRequest:(id<MXKeyVerificationRequest>)request
+- (MXHTTPOperation*)sendToOtherInRequest:(MXKeyVerificationRequest*)request
                                eventType:(NSString*)eventType
                                  content:(NSDictionary*)content
                                  success:(dispatch_block_t)success
@@ -68,11 +68,11 @@ NS_ASSUME_NONNULL_BEGIN
  @param success a block called when the operation succeeds.
  @param failure a block called when the operation fails.
  */
-- (void)cancelVerificationRequest:(id<MXKeyVerificationRequest>)request
+- (void)cancelVerificationRequest:(MXKeyVerificationRequest*)request
                           success:(void(^)(void))success
                           failure:(void(^)(NSError *error))failure;
 
-- (BOOL)isRequestStillValid:(id<MXKeyVerificationRequest>)request;
+- (BOOL)isRequestStillValid:(MXKeyVerificationRequest*)request;
 
 - (void)removePendingRequestWithRequestId:(NSString*)requestId;
 
@@ -88,12 +88,12 @@ NS_ASSUME_NONNULL_BEGIN
                                 transactionId:(nullable NSString*)transactionId
                                      dmRoomId:(nullable NSString*)dmRoomId
                                     dmEventId:(nullable NSString*)dmEventId
-                                      success:(void(^)(MXLegacyQRCodeTransaction *transaction))success
+                                      success:(void(^)(MXQRCodeTransaction *transaction))success
                                       failure:(void(^)(NSError *error))failure;
 
-- (void)createQRCodeTransactionFromRequest:(id<MXKeyVerificationRequest>)request
+- (void)createQRCodeTransactionFromRequest:(MXKeyVerificationRequest*)request
                                 qrCodeData:(nullable MXQRCodeData*)qrCodeData
-                                   success:(void(^)(MXLegacyQRCodeTransaction *transaction))success
+                                   success:(void(^)(MXQRCodeTransaction *transaction))success
                                    failure:(void(^)(NSError *error))failure;
 
 - (BOOL)isOtherQRCodeDataKeysValid:(MXQRCodeData*)otherQRCodeData otherUserId:(NSString*)otherUserId otherDevice:(MXDeviceInfo*)otherDevice;
@@ -112,7 +112,7 @@ NS_ASSUME_NONNULL_BEGIN
 
  @return a MXHTTPOperation instance.
  */
-- (MXHTTPOperation*)sendToOtherInTransaction:(id<MXKeyVerificationTransaction>)transaction
+- (MXHTTPOperation*)sendToOtherInTransaction:(MXKeyVerificationTransaction*)transaction
                                    eventType:(NSString*)eventType
                                      content:(NSDictionary*)content
                                      success:(void (^)(void))success
@@ -126,7 +126,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param success A block object called when the operation succeeds.
  @param failure A block object called when the operation fails.
  */
-- (void)cancelTransaction:(id<MXKeyVerificationTransaction>)transaction
+- (void)cancelTransaction:(MXKeyVerificationTransaction*)transaction
                      code:(MXTransactionCancelCode*)code
                   success:(void (^)(void))success
                   failure:(void (^)(NSError *error))failure;

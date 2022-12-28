@@ -17,13 +17,13 @@
 #import "MXEvent.h"
 
 /**
- The `MXEventsEnumerator` protocol defines an interface that must be implemented
+ The `MXStoreEventsEnumerator` protocol defines an interface that must be implemented 
  in order to iterate on a list of events.
  
  This interface is used in the MXStore to manage the results of requests on the store
  database.
 
- The `MXEventsEnumerator` implementation must start the iteration on the most recent
+ The `MXStoreEventsEnumerator` implementation must start the iteration on the most recent
  events of the list.
  */
 @protocol MXEventsEnumerator <NSObject>
@@ -31,11 +31,10 @@
 /**
  Return next events in the enumerator.
  
- @param eventsCount the number of events to get.
- @param threadId identifier of the thread, to get next events from. Pass nil not to filter by a thread.
- @return an array of events in chronological order. Nil if there is no more events. Number of returned events may be higher than `eventsCount` if `threadId` not provided.
+ @eventsCount the number of events to get.
+ @return an array of events in chronological order. Nil if there is no more events.
  */
-- (NSArray<MXEvent*>*)nextEventsBatch:(NSUInteger)eventsCount threadId:(NSString *)threadId;
+- (NSArray<MXEvent*>*)nextEventsBatch:(NSUInteger)eventsCount;
 
 /**
  The next event in the enumerator.

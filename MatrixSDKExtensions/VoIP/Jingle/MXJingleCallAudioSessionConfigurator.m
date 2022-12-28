@@ -33,10 +33,8 @@
 {
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     
-    AVAudioSessionCategoryOptions desiredOptions = AVAudioSessionCategoryOptionAllowBluetooth | AVAudioSessionCategoryOptionAllowBluetoothA2DP;
-    
     [audioSession setCategory:AVAudioSessionCategoryPlayAndRecord
-                  withOptions:desiredOptions
+                  withOptions:AVAudioSessionCategoryOptionAllowBluetooth
                         error:nil];
     
     // AVAudioSessionModeVideoChat is optimized for video calls on modern devices. Instead of using the speaker from the bottom
@@ -46,10 +44,10 @@
     [audioSession setMode:mode error:nil];
     
     // Sometimes category options don't stick after setting mode.
-    if (audioSession.categoryOptions != desiredOptions)
+    if (audioSession.categoryOptions != AVAudioSessionCategoryOptionAllowBluetooth)
     {
         [audioSession setCategory:AVAudioSessionCategoryPlayAndRecord
-                      withOptions:desiredOptions
+                      withOptions:AVAudioSessionCategoryOptionAllowBluetooth
                             error:nil];
     }
     
@@ -83,9 +81,6 @@
     
     [audioSession setPreferredSampleRate:sampleRate error:nil];
     [audioSession setPreferredIOBufferDuration:ioBufferDuration error:nil];
-    
-    // Initialize audio manually, activate audio only when needed
-    RTCAudioSession.sharedInstance.useManualAudio = YES;
 }
 
 - (void)audioSessionDidActivate:(AVAudioSession *)audioSession
@@ -95,20 +90,11 @@
     [audioSession setPreferredOutputNumberOfChannels:kRTCAudioSessionPreferredNumberOfChannels error:nil];
     
     [RTCAudioSession.sharedInstance audioSessionDidActivate:audioSession];
-    RTCAudioSession.sharedInstance.isAudioEnabled = YES;
 }
 
 - (void)audioSessionDidDeactivate:(AVAudioSession *)audioSession
 {
     [RTCAudioSession.sharedInstance audioSessionDidDeactivate:audioSession];
-    RTCAudioSession.sharedInstance.isAudioEnabled = NO;
-}
-
-- (void)configureAudioSessionAfterCallEnds
-{
-    RTCAudioSession.sharedInstance.isAudioEnabled = NO;
-    // Reset useManualAudio property to default value
-    RTCAudioSession.sharedInstance.useManualAudio = NO;
 }
 
 @end

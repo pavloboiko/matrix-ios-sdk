@@ -21,16 +21,17 @@
 
 #import "MXSession.h"
 #import "MXTools.h"
-#import "MXMemoryStore.h"
+
 
 // Do not bother with retain cycles warnings in tests
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-retain-cycles"
-#pragma clang diagnostic ignored "-Wdeprecated"
 
 @interface MXRoomStateTests : XCTestCase
 {
     MatrixSDKTestsData *matrixSDKTestsData;
+
+    MXSession *mxSession;
 }
 @end
 
@@ -45,6 +46,12 @@
 
 - (void)tearDown
 {
+    if (mxSession)
+    {
+        [mxSession close];
+        mxSession = nil;
+    }
+    
     matrixSDKTestsData = nil;
     
     [super tearDown];
@@ -52,7 +59,9 @@
 
 - (void)testIsJoinRulePublic
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+
+        mxSession = mxSession2;
 
         [room state:^(MXRoomState *roomState) {
 
@@ -65,7 +74,9 @@
 
 - (void)testIsJoinRulePublicForAPrivateRoom
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+        
+        mxSession = mxSession2;
 
         [room state:^(MXRoomState *roomState) {
             XCTAssertFalse(roomState.isJoinRulePublic, @"This room join rule must be private");
@@ -83,9 +94,7 @@
         
         [bobRestClient setRoomTopic:roomId topic:@"My topic" success:^{
             
-            MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-            [matrixSDKTestsData retain:mxSession];
-            
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
             [mxSession start:^{
                 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -116,15 +125,13 @@
         
         MXRestClient *bobRestClient2 = bobRestClient;
         
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
             
             MXRoom *room = [mxSession roomWithRoomId:roomId];
 
             // Listen to live event. We should receive only one: a m.room.topic event
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertNil(liveTimeline.state.topic, @"There must be no room topic yet. Found: %@", liveTimeline.state.topic);
 
@@ -166,9 +173,7 @@
 
         [bobRestClient setRoomAvatar:roomId avatar:@"http://matrix.org/matrix.png" success:^{
 
-            MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-            [matrixSDKTestsData retain:mxSession];
-            
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
             [mxSession start:^{
 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -199,15 +204,13 @@
 
         MXRestClient *bobRestClient2 = bobRestClient;
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
 
             MXRoom *room = [mxSession roomWithRoomId:roomId];
 
             // Listen to live event. We should receive only one: a m.room.avatar event
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertNil(liveTimeline.state.avatar, @"There must be no room avatar yet. Found: %@", liveTimeline.state.avatar);
 
@@ -247,9 +250,7 @@
         
         [bobRestClient setRoomName:roomId name:@"My room name" success:^{
             
-            MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-            [matrixSDKTestsData retain:mxSession];
-            
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
             [mxSession start:^{
                 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -281,15 +282,13 @@
         
         MXRestClient *bobRestClient2 = bobRestClient;
         
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
             
             MXRoom *room = [mxSession roomWithRoomId:roomId];
 
             // Listen to live event. We should receive only one: a m.room.name event
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertNil(liveTimeline.state.name, @"There must be no room name yet. Found: %@", liveTimeline.state.name);
 
@@ -329,9 +328,7 @@
 
         [bobRestClient setRoomHistoryVisibility:roomId historyVisibility:kMXRoomHistoryVisibilityWorldReadable success:^{
 
-            MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-            [matrixSDKTestsData retain:mxSession];
-            
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
             [mxSession start:^{
 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -363,15 +360,13 @@
 
         MXRestClient *bobRestClient2 = bobRestClient;
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
 
             MXRoom *room = [mxSession roomWithRoomId:roomId];
 
             // Listen to live event. We should receive only one: a m.room.name event
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertEqualObjects(liveTimeline.state.historyVisibility, kMXRoomHistoryVisibilityShared, @"The default room history visibility should be shared");
 
@@ -412,9 +407,7 @@
 
         [bobRestClient setRoomJoinRule:roomId joinRule:kMXRoomJoinRulePublic success:^{
 
-            MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-            [matrixSDKTestsData retain:mxSession];
-            
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
             [mxSession start:^{
 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -445,15 +438,13 @@
 
         MXRestClient *bobRestClient2 = bobRestClient;
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
 
             MXRoom *room = [mxSession roomWithRoomId:roomId];
 
             // Listen to live event. We should receive only one: a m.room.name event
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertEqualObjects(liveTimeline.state.joinRule, kMXRoomJoinRuleInvite, @"The default room join rule should be invite");
 
@@ -494,9 +485,7 @@
 
         [bobRestClient setRoomGuestAccess:roomId guestAccess:kMXRoomGuestAccessCanJoin success:^{
 
-            MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-            [matrixSDKTestsData retain:mxSession];
-            
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
             [mxSession start:^{
 
                 MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -527,15 +516,13 @@
 
         MXRestClient *bobRestClient2 = bobRestClient;
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
 
             MXRoom *room = [mxSession roomWithRoomId:roomId];
 
             // Listen to live event. We should receive only one: a m.room.name event
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertEqualObjects(liveTimeline.state.guestAccess, kMXRoomGuestAccessCanJoin, @"The default room guest access should be forbidden");
 
@@ -581,9 +568,7 @@
             // Use this alias as the canonical alias
             [bobRestClient2 setRoomCanonicalAlias:roomId canonicalAlias:roomAlias success:^{
                 
-                MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-                [matrixSDKTestsData retain:mxSession];
-                
+                mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
                 [mxSession start:^{
                     
                     MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -625,9 +610,7 @@
         
         MXRestClient *bobRestClient2 = bobRestClient;
         
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient2];
         [mxSession start:^{
             
             MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -636,7 +619,7 @@
             NSString *roomAlias = [NSString stringWithFormat:@"#%@%@", globallyUniqueString, bobRestClient.homeserverSuffix];
             
             // Listen to live event. We should receive only: a m.room.aliases and m.room.canonical_alias events
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 XCTAssertNil(liveTimeline.state.aliases);
                 XCTAssertNil(liveTimeline.state.canonicalAlias);
@@ -692,9 +675,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestInABobRoomAndANewTextMessage:self newTextMessage:@"This is a text message for recents" onReadyToTest:^(MXRestClient *bobRestClient, NSString *roomId, NSString *new_text_message_eventId, XCTestExpectation *expectation) {
         
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
         [mxSession start:^{
             
             MXRoom *room = [mxSession roomWithRoomId:roomId];
@@ -730,7 +711,9 @@
 
 - (void)testMemberName
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+        
+        mxSession = mxSession2;
 
         NSString *bobUserId = matrixSDKTestsData.bobCredentials.userId;
 
@@ -753,7 +736,9 @@
 
 - (void)testStateEvents
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+        
+        mxSession = mxSession2;
 
         [room state:^(MXRoomState *roomState) {
             XCTAssertNotNil(roomState.stateEvents);
@@ -766,7 +751,9 @@
 
 - (void)testAliases
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+        
+        mxSession = mxSession2;
 
         [room state:^(MXRoomState *roomState) {
             XCTAssertNotNil(roomState.aliases);
@@ -795,7 +782,7 @@
  */
 - (void)createInviteByUserScenario:(MXRestClient*)bobRestClient inRoom:(NSString*)roomId inviteAlice:(BOOL)inviteAlice expectation:(XCTestExpectation*)expectation onComplete:(void(^)(void))onComplete
 {
-    [bobRestClient sendTextMessageToRoom:roomId threadId:nil text:@"Hello world" success:^(NSString *eventId) {
+    [bobRestClient sendTextMessageToRoom:roomId text:@"Hello world" success:^(NSString *eventId) {
 
         MXRestClient *bobRestClient2 = bobRestClient;
 
@@ -809,7 +796,7 @@
                     {
                         [bobRestClient2 inviteUser:matrixSDKTestsData.aliceCredentials.userId toRoom:roomId success:^{
 
-                            [bobRestClient2 sendTextMessageToRoom:roomId threadId:nil text:@"I wait for Alice" success:^(NSString *eventId) {
+                            [bobRestClient2 sendTextMessageToRoom:roomId text:@"I wait for Alice" success:^(NSString *eventId) {
 
                                 onComplete();
 
@@ -851,45 +838,46 @@
         
         [self createInviteByUserScenario:bobRestClient inRoom:roomId inviteAlice:YES expectation:expectation onComplete:^{
             
-            [matrixSDKTestsData doMXSessionTestWithAlice:nil andStore:[MXMemoryStore new] readyToTest:^(MXSession *mxSession, XCTestExpectation *expectation2) {
+            [matrixSDKTestsData doMXRestClientTestWithAlice:nil readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation2) {
                 
-                MXRoom *newRoom = [mxSession roomWithRoomId:roomId];
+                mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
                 
-                XCTAssertNotNil(newRoom);
-                
-                XCTAssertEqual(newRoom.summary.membership, MXMembershipInvite);
-                
-                // The room has 2 members (Alice & Bob)
-                XCTAssertEqual(newRoom.summary.membersCount.members, 2);
+                [mxSession start:^{
+                    
+                    MXRoom *newRoom = [mxSession roomWithRoomId:roomId];
+                    
+                    XCTAssertNotNil(newRoom);
+                    
+                    XCTAssertEqual(newRoom.summary.membership, MXMembershipInvite);
+                    
+                    // The room has 2 members (Alice & Bob)
+                    XCTAssertEqual(newRoom.summary.membersCount.members, 2);
 
-                [newRoom members:^(MXRoomMembers *roomMembers) {
+                    [newRoom members:^(MXRoomMembers *roomMembers) {
 
-                    MXRoomMember *alice = [roomMembers memberWithUserId:mxSession.myUserId];
-                    XCTAssertNotNil(alice);
-                    XCTAssertEqual(alice.membership, MXMembershipInvite);
-                    XCTAssert([alice.originUserId isEqualToString:bobRestClient.credentials.userId], @"Wrong inviter: %@", alice.originUserId);
+                        MXRoomMember *alice = [roomMembers memberWithUserId:aliceRestClient.credentials.userId];
+                        XCTAssertNotNil(alice);
+                        XCTAssertEqual(alice.membership, MXMembershipInvite);
+                        XCTAssert([alice.originUserId isEqualToString:bobRestClient.credentials.userId], @"Wrong inviter: %@", alice.originUserId);
 
-                    // The last message should be an invite m.room.member
-                    [mxSession eventWithEventId:newRoom.summary.lastMessage.eventId
-                                         inRoom:newRoom.roomId
-                                        success:^(MXEvent *lastMessage) {
-                        
+                        // The last message should be an invite m.room.member
+                        MXEvent *lastMessage = newRoom.summary.lastMessageEvent;
                         XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMember, @"The last message should be an invite m.room.member");
                         XCTAssertLessThan([[NSDate date] timeIntervalSince1970] * 1000 - lastMessage.originServerTs, 3000);
 
                         [expectation fulfill];
-                        
+
                     } failure:^(NSError *error) {
                         XCTFail(@"The request should not fail - NSError: %@", error);
                         [expectation fulfill];
                     }];
-
+                    
                 } failure:^(NSError *error) {
                     XCTFail(@"The request should not fail - NSError: %@", error);
                     [expectation fulfill];
                 }];
-                
             }];
+            
         }];
         
     }];
@@ -899,70 +887,68 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithBobAndARoom:self readyToTest:^(MXRestClient *bobRestClient, NSString *roomId, XCTestExpectation *expectation) {
         
-        [matrixSDKTestsData doMXSessionTestWithAlice:nil andStore:[MXMemoryStore new] readyToTest:^(MXSession *mxSession, XCTestExpectation *expectation2) {
+        [matrixSDKTestsData doMXRestClientTestWithAlice:nil readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation2) {
             
-            __block MXRoom *newRoom;
-            __block id listener;
+            mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
             
-            listener = [mxSession listenToEvents:^(MXEvent *event, MXTimelineDirection direction, id customObject) {
+            [mxSession start:^{
                 
-                if ([event.roomId isEqualToString:roomId])
-                {
-                    newRoom = [mxSession roomWithRoomId:roomId];
+                __block MXRoom *newRoom;
+                
+                [mxSession listenToEvents:^(MXEvent *event, MXTimelineDirection direction, id customObject) {
                     
-                    XCTAssertNotNil(newRoom);
-                    
-                    if (newRoom.summary.membership != MXMembershipUnknown)
+                    if ([event.roomId isEqualToString:roomId])
                     {
-                        [mxSession removeListener:listener];
-                        XCTAssertEqual(newRoom.summary.membership, MXMembershipInvite);
+                        newRoom = [mxSession roomWithRoomId:roomId];
                         
-                        // The room has 2 members (Alice & Bob)
-                        XCTAssertEqual(newRoom.summary.membersCount.members, 2);
-                        
-                        [newRoom members:^(MXRoomMembers *roomMembers) {
-                            
-                            MXRoomMember *alice = [roomMembers memberWithUserId:mxSession.myUserId];
-                            XCTAssertNotNil(alice);
-                            XCTAssertEqual(alice.membership, MXMembershipInvite);
-                            XCTAssert([alice.originUserId isEqualToString:bobRestClient.credentials.userId], @"Wrong inviter: %@", alice.originUserId);
-                            
-                            // The last message should be an invite m.room.member
-                            dispatch_async(dispatch_get_main_queue(), ^{    // We could also wait for kMXRoomSummaryDidChangeNotification
-                                
-                                [mxSession eventWithEventId:newRoom.summary.lastMessage.eventId
-                                                     inRoom:newRoom.roomId
-                                                    success:^(MXEvent *lastMessage) {
-                                    
+                        XCTAssertNotNil(newRoom);
+
+                        if (newRoom.summary.membership != MXMembershipUnknown)
+                        {
+                            XCTAssertEqual(newRoom.summary.membership, MXMembershipInvite);
+
+                            // The room has 2 members (Alice & Bob)
+                            XCTAssertEqual(newRoom.summary.membersCount.members, 2);
+
+                            [newRoom members:^(MXRoomMembers *roomMembers) {
+
+                                MXRoomMember *alice = [roomMembers memberWithUserId:aliceRestClient.credentials.userId];
+                                XCTAssertNotNil(alice);
+                                XCTAssertEqual(alice.membership, MXMembershipInvite);
+                                XCTAssert([alice.originUserId isEqualToString:bobRestClient.credentials.userId], @"Wrong inviter: %@", alice.originUserId);
+
+                                // The last message should be an invite m.room.member
+                                dispatch_async(dispatch_get_main_queue(), ^{    // We could also wait for kMXRoomSummaryDidChangeNotification
+
+                                    MXEvent *lastMessage = newRoom.summary.lastMessageEvent;
                                     XCTAssertNotNil(lastMessage);
                                     XCTAssertEqual(lastMessage.eventType, MXEventTypeRoomMember, @"The last message should be an invite m.room.member");
                                     XCTAssertLessThan([[NSDate date] timeIntervalSince1970] * 1000 - lastMessage.originServerTs, 3000);
-                                    
-                                    [expectation fulfill];
-                                    
-                                } failure:^(NSError *error) {
-                                    XCTFail(@"The request should not fail - NSError: %@", error);
-                                    [expectation fulfill];
-                                }];
+
+                                });
                                 
-                            });
-                            
-                        } failure:^(NSError *error) {
-                            XCTFail(@"The request should not fail - NSError: %@", error);
-                            [expectation fulfill];
-                        }];
+                            } failure:^(NSError *error) {
+                                XCTFail(@"The request should not fail - NSError: %@", error);
+                                [expectation fulfill];
+                            }];
+                        }
                     }
-                }
+                    
+                }];
                 
+                [self createInviteByUserScenario:bobRestClient inRoom:roomId inviteAlice:YES expectation:expectation onComplete:^{
+                    
+                    // Make sure we have tested something
+                    XCTAssertNotNil(newRoom);
+                    [expectation fulfill];
+                    
+                }];
+                
+            } failure:^(NSError *error) {
+                XCTFail(@"The request should not fail - NSError: %@", error);
+                [expectation fulfill];
             }];
             
-            [self createInviteByUserScenario:bobRestClient inRoom:roomId inviteAlice:YES expectation:expectation onComplete:^{
-                
-                // Make sure we have tested something
-                XCTAssertNotNil(newRoom);
-                
-            }];
-                
         }];
         
     }];
@@ -977,14 +963,13 @@
             
             [matrixSDKTestsData doMXRestClientTestWithAlice:nil readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation2) {
                 
-                MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-                [matrixSDKTestsData retain:mxSession];
+                mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
                 
                 [mxSession start:^{
                     
                     MXRoom *newRoom = [mxSession roomWithRoomId:roomId];
 
-                    [newRoom liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                    [newRoom liveTimeline:^(MXEventTimeline *liveTimeline) {
                         [liveTimeline listenToEvents:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
                             if (MXTimelineDirectionForwards == event)
                             {
@@ -1017,22 +1002,12 @@
                         
                         XCTAssertEqual(newRoom.summary.membership, MXMembershipJoin);
 
-                        XCTAssertNotNil(newRoom.summary.lastMessage.eventId);
+                        XCTAssertNotNil(newRoom.summary.lastMessageEventId);
+                        XCTAssertNotNil(newRoom.summary.lastMessageEvent);
                         
-                        [mxSession eventWithEventId:newRoom.summary.lastMessage.eventId
-                                             inRoom:newRoom.roomId
-                                            success:^(MXEvent *event) {
-                            
-                            XCTAssertNotNil(event);
-                            
-                            XCTAssertEqual(event.eventType, MXEventTypeRoomMember, @"The last should be a m.room.member event indicating Alice joining the room");
-                            
-                            [expectation fulfill];
-                            
-                        } failure:^(NSError *error) {
-                            XCTFail(@"The request should not fail - NSError: %@", error);
-                            [expectation fulfill];
-                        }];
+                        XCTAssertEqual(newRoom.summary.lastMessageEvent.eventType, MXEventTypeRoomMember, @"The last should be a m.room.member event indicating Alice joining the room");
+                        
+                        [expectation fulfill];
                         
                     } failure:^(NSError *error) {
                         XCTFail(@"The request should not fail - NSError: %@", error);
@@ -1059,8 +1034,7 @@
             
             [matrixSDKTestsData doMXRestClientTestWithAlice:nil readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation2) {
                 
-                MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-                [matrixSDKTestsData retain:mxSession];
+                mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
                 
                 [mxSession start:^{
                     
@@ -1084,21 +1058,10 @@
                             XCTAssertEqualObjects(roomState.topic, @"We test room invitation here");
 
                             XCTAssertEqual(newRoom.summary.membership, MXMembershipJoin);
-                            XCTAssertNotNil(newRoom.summary.lastMessage);
-                            
-                            [mxSession eventWithEventId:newRoom.summary.lastMessage.eventId
-                                                 inRoom:newRoom.roomId
-                                                success:^(MXEvent *event) {
-                                
-                                XCTAssertEqual(event.eventType, MXEventTypeRoomMember, @"The last should be a m.room.member event indicating Alice joining the room");
+                            XCTAssertNotNil(newRoom.summary.lastMessageEvent);
+                            XCTAssertEqual(newRoom.summary.lastMessageEvent.eventType, MXEventTypeRoomMember, @"The last should be a m.room.member event indicating Alice joining the room");
 
-                                [expectation fulfill];
-                                
-                            } failure:^(NSError *error) {
-                                XCTFail(@"The request should not fail - NSError: %@", error);
-                                [expectation fulfill];
-                            }];
-                            
+                            [expectation fulfill];
                         }];
                         
                     } failure:^(NSError *error) {
@@ -1121,8 +1084,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithBobAndAliceInARoom:self readyToTest:^(MXRestClient *bobRestClient, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
 
         [mxSession start:^{
 
@@ -1186,9 +1148,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithAlice:self readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
         [mxSession start:^{
 
             __block NSString *newRoomId;
@@ -1217,9 +1177,9 @@
 
                 newRoomId = roomId;
 
-                [bobRestClient sendTextMessageToRoom:roomId threadId:nil text:@"Hi Alice!" success:^(NSString *eventId) {
+                [bobRestClient sendTextMessageToRoom:roomId text:@"Hi Alice!" success:^(NSString *eventId) {
 
-                    [bobRestClient sendTextMessageToRoom:roomId threadId:nil text:@"Hi Alice 2!" success:^(NSString *eventId) {
+                    [bobRestClient sendTextMessageToRoom:roomId text:@"Hi Alice 2!" success:^(NSString *eventId) {
 
                     } failure:^(NSError *error) {
                         XCTFail(@"Cannot set up intial test conditions - error: %@", error);
@@ -1242,9 +1202,7 @@
 - (void)testRoomStateWhenARoomHasBeenJoinedOnAnotherMatrixClientAndNotifications {
     [matrixSDKTestsData doMXRestClientTestWithAlice:self readyToTest:^(MXRestClient *aliceRestClient, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:mxSession];
-        
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
         [mxSession start:^{
 
             __block NSString *newRoomId;
@@ -1285,31 +1243,6 @@
             
         } failure:^(NSError *error) {
             XCTFail(@"Cannot set up intial test conditions - error: %@", error);
-            [expectation fulfill];
-        }];
-    }];
-}
-
-- (void)testDeallocation
-{
-    __weak __block MXRoomState *weakState;
-    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
-        [room state:^(MXRoomState *roomState) {
-            weakState = roomState;
-            XCTAssertNotNil(weakState);
-            [expectation fulfill];
-        }];
-    }];
-    XCTAssertNil(weakState);
-}
-
-- (void)testCopying
-{
-    [matrixSDKTestsData doMXSessionTestWithBobAndThePublicRoom:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
-
-        [room state:^(MXRoomState *roomState) {
-            MXRoomState *roomStateCopy = [roomState copy];
-            XCTAssertEqual(roomStateCopy.members.members.count, roomState.members.members.count);
             [expectation fulfill];
         }];
     }];

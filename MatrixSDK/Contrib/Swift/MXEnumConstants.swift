@@ -51,9 +51,6 @@ public enum MXRoomJoinRule: Equatable, Hashable {
     /// A user who wishes to join the room must first receive an invite to the room from someone already inside of the room.
     case invite
     
-    /// The room is public to any member of spaces declared as `allowed`. It will be private otherwise.
-    case restricted
-    
     /// Reserved keyword which is not implemented by homeservers.
     case `private`, knock
     
@@ -63,12 +60,11 @@ public enum MXRoomJoinRule: Equatable, Hashable {
         case .invite: return kMXRoomJoinRuleInvite
         case .private: return kMXRoomJoinRulePrivate
         case .knock: return kMXRoomJoinRuleKnock
-        case .restricted: return kMXRoomJoinRuleRestricted
         }
     }
     
     public init?(identifier: String?) {
-        let joinRules: [MXRoomJoinRule] = [.public, .invite, .private, .knock, .restricted]
+        let joinRules: [MXRoomJoinRule] = [.public, .invite, .private, .knock]
         guard let value = joinRules.first(where: { $0.identifier == identifier}) else { return nil }
         self = value
     }
@@ -160,45 +156,30 @@ public enum MXRoomPreset: Equatable, Hashable {
     }
 }
 
-extension MXSessionState: CustomStringConvertible {
+
+
+/**
+ The direction of an event in the timeline.
+ */
+public enum MXTimelineDirection: Equatable, Hashable {
     
-    public var description: String {
+    /// Forwards when the event is added to the end of the timeline.
+    /// These events come from the /sync stream or from forwards pagination.
+    case forwards
+    
+    /// Backwards when the event is added to the start of the timeline.
+    /// These events come from a back pagination.
+    case backwards
+    
+    public var identifier: __MXTimelineDirection {
         switch self {
-        case .closed:
-            return "closed"
-        case .initialised:
-            return "initialized"
-        case .storeDataReady:
-            return "storeDataReady"
-        case .processingBackgroundSyncCache:
-            return "processingBackgroundSyncCache"
-        case .syncInProgress:
-            return "syncInProgress"
-        case .backgroundSyncInProgress:
-            return "backgroundSyncInProgress"
-        case .running:
-            return "running"
-        case .homeserverNotReachable:
-            return "homeserverNotReachable"
-        case .syncError:
-            return "syncError"
-        case .paused:
-            return "paused"
-        case .pauseRequested:
-            return "pauseRequested"
-        case .initialSyncFailed:
-            return "initialSyncFailed"
-        @unknown default:
-            return "\(self.rawValue)"
+        case .forwards: return __MXTimelineDirectionForwards
+        case .backwards: return __MXTimelineDirectionBackwards
         }
     }
     
+    public init(identifer _identifier: __MXTimelineDirection) {
+        self = (_identifier == __MXTimelineDirectionForwards ? .forwards : .backwards)
+    }
 }
 
-extension MXSessionState: CustomDebugStringConvertible {
-    
-    public var debugDescription: String {
-        return description
-    }
-    
-}

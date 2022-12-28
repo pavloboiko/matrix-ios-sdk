@@ -39,13 +39,12 @@
 @implementation MXPushRuleDisplayNameCondtionChecker
 
 - (instancetype)initWithMatrixSession:(MXSession *)mxSession2
-               currentUserDisplayName:(NSString* _Nullable)currentUserDisplayName
 {
     self = [super init];
     if (self)
     {
         mxSession = mxSession2;
-        currentUserName = currentUserDisplayName;
+        currentUserName = nil;
     }
     return self;
 }
@@ -53,19 +52,12 @@
 - (BOOL)isCondition:(MXPushRuleCondition*)condition satisfiedBy:(MXEvent*)event roomState:(MXRoomState*)roomState withJsonDict:(NSDictionary*)contentAsJsonDict
 {
     BOOL isSatisfied = NO;
-    
-    NSString *displayName = currentUserName;
-    
-    if (!displayName)
-    {
-        displayName = mxSession.myUser.displayname;
-    }
 
     // If it exists, search for the current display name in the content body with case insensitive
-    if (displayName && event.content)
+    if (mxSession.myUser.displayname && event.content)
     {
         NSObject* bodyAsVoid;
-        MXJSONModelSet(bodyAsVoid, NSObject.class, event.content[kMXMessageBodyKey]);
+        MXJSONModelSet(bodyAsVoid, NSObject.class, event.content[@"body"]);
         
         if (bodyAsVoid && [bodyAsVoid isKindOfClass:[NSString class]])
         {
@@ -73,10 +65,10 @@
             
             if (body)
             {
-                if (!userNameRegex || ![currentUserName isEqualToString:displayName])
+                if (!userNameRegex || ![currentUserName isEqualToString:mxSession.myUser.displayname])
                 {
-                    userNameRegex = [NSRegularExpression regularExpressionWithPattern:[NSString stringWithFormat:@"(^|\\W)\\Q%@\\E($|\\W)", displayName] options:NSRegularExpressionCaseInsensitive error:nil];
-                    currentUserName = displayName;
+                    userNameRegex = [NSRegularExpression regularExpressionWithPattern:[NSString stringWithFormat:@"(^|\\W)\\Q%@\\E($|\\W)", mxSession.myUser.displayname] options:NSRegularExpressionCaseInsensitive error:nil];
+                    currentUserName = mxSession.myUser.displayname;
                 }
 
                 NSRange range = [userNameRegex rangeOfFirstMatchInString:body options:0 range:NSMakeRange(0, body.length)];

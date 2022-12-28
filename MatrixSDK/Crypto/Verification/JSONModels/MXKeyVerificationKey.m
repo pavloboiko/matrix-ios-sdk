@@ -48,7 +48,7 @@
 
     if (_key.length == 0)
     {
-        MXLogDebug(@"[MXKeyVerification] Invalid MXKeyVerificationKey: %@", self);
+        NSLog(@"[MXKeyVerification] Invalid MXKeyVerificationKey: %@", self);
         isValid = NO;
     }
 

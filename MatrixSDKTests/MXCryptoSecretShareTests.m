@@ -23,7 +23,6 @@
 
 #import "MatrixSDKTestsData.h"
 #import "MatrixSDKTestsE2EData.h"
-#import "MatrixSDKTestsSwiftHeader.h"
 
 
 @interface MXCryptoSecretShareTests : XCTestCase
@@ -49,8 +48,6 @@
 {
     matrixSDKTestsData = nil;
     matrixSDKTestsE2EData = nil;
-    
-    [super tearDown];
 }
 
 /**
@@ -63,16 +60,16 @@
         NSString *secret = @"A secret";
         NSString *secret2 = @"A secret2";
 
-        XCTAssertNil([aliceSession.legacyCrypto.store secretWithSecretId:secretId]);
+        XCTAssertNil([aliceSession.crypto.store secretWithSecretId:secretId]);
         
-        [aliceSession.legacyCrypto.store storeSecret:secret withSecretId:secretId];
-        XCTAssertEqualObjects([aliceSession.legacyCrypto.store secretWithSecretId:secretId], secret);
+        [aliceSession.crypto.store storeSecret:secret withSecretId:secretId];
+        XCTAssertEqualObjects([aliceSession.crypto.store secretWithSecretId:secretId], secret);
         
-        [aliceSession.legacyCrypto.store storeSecret:secret2 withSecretId:secretId];
-        XCTAssertEqualObjects([aliceSession.legacyCrypto.store secretWithSecretId:secretId], secret2);
+        [aliceSession.crypto.store storeSecret:secret2 withSecretId:secretId];
+        XCTAssertEqualObjects([aliceSession.crypto.store secretWithSecretId:secretId], secret2);
         
-        [aliceSession.legacyCrypto.store deleteSecretWithSecretId:secretId];
-        XCTAssertNil([aliceSession.legacyCrypto.store secretWithSecretId:secretId]);
+        [aliceSession.crypto.store deleteSecretWithSecretId:secretId];
+        XCTAssertNil([aliceSession.crypto.store secretWithSecretId:secretId]);
         
         [expectation fulfill];
     }];
@@ -83,7 +80,7 @@
  
  - Alice has a secret on her 1st device
  - Alice logs in on a new device
- - Alice trusts the new device and vice versa
+ - Alice trusts the new device
  - Alice requests the secret from the new device
  -> She gets the secret
  */
@@ -95,19 +92,18 @@
         NSString *secret = @"A secret";
 
         // - Alice has a secret on her 1st device
-        [aliceSession.legacyCrypto.store storeSecret:secret withSecretId:secretId];
+        [aliceSession.crypto.store storeSecret:secret withSecretId:secretId];
         
         // - Alice logs in on a new device
-        [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *newAliceSession) {
+        [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *newAliceSession) {
             
             MXCredentials *newAlice = newAliceSession.matrixRestClient.credentials;
             
-            // - Alice trusts the new device and vice versa
+            // - Alice trusts the new device
             [aliceSession.crypto setDeviceVerification:MXDeviceVerified forDevice:newAlice.deviceId ofUser:newAlice.userId success:nil failure:nil];
-            [newAliceSession.crypto setDeviceVerification:MXDeviceVerified forDevice:aliceSession.myDeviceId ofUser:aliceSession.myUserId success:nil failure:nil];
             
             // - Alice requests the secret from the new device
-            [newAliceSession.legacyCrypto.secretShareManager requestSecret:secretId toDeviceIds:nil success:^(NSString * _Nonnull requestId) {
+            [newAliceSession.crypto.secretShareManager requestSecret:secretId toDeviceIds:nil success:^(NSString * _Nonnull requestId) {
                 XCTAssertNotNil(requestId);
             } onSecretReceived:^BOOL(NSString * _Nonnull sharedSecret) {
                 
@@ -143,10 +139,10 @@
         NSString *secret = @"A secret";
         
         // - Alice has a secret on her 1st device
-        [aliceSession.legacyCrypto.store storeSecret:secret withSecretId:secretId];
+        [aliceSession.crypto.store storeSecret:secret withSecretId:secretId];
         
         // - Alice logs in on a new device
-        [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *newAliceSession) {
+        [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *newAliceSession) {
             
             MXCredentials *newAlice = newAliceSession.matrixRestClient.credentials;
             
@@ -157,10 +153,10 @@
             [aliceSession pause];
             
             // - Alice requests the secret from the new device
-            [newAliceSession.legacyCrypto.secretShareManager requestSecret:secretId toDeviceIds:nil success:^(NSString * _Nonnull requestId) {
+            [newAliceSession.crypto.secretShareManager requestSecret:secretId toDeviceIds:nil success:^(NSString * _Nonnull requestId) {
                 
                 // - Alice cancels the request
-                [newAliceSession.legacyCrypto.secretShareManager cancelRequestWithRequestId:requestId success:^{
+                [newAliceSession.crypto.secretShareManager cancelRequestWithRequestId:requestId success:^{
                 } failure:^(NSError * _Nonnull error) {
                     XCTFail(@"The operation should not fail - NSError: %@", error);
                     [expectation fulfill];

@@ -27,10 +27,7 @@
 @synthesize audioMuted;
 @synthesize cameraPosition;
 @synthesize videoMuted;
-@synthesize canSendDTMF;
-#if TARGET_OS_IPHONE
-@synthesize selfOrientation;
-#endif
+@synthesize audioToSpeaker;
 
 - (instancetype)init
 {
@@ -92,21 +89,6 @@
 
 - (void)handleOffer:(nonnull NSString *)sdpOffer success:(nonnull void (^)(void))success failure:(nonnull void (^)(NSError * _Nonnull))failure
 {    
-}
-
-- (void)hold:(BOOL)hold success:(nonnull void (^)(NSString * _Nonnull))success failure:(nonnull void (^)(NSError * _Nonnull))failure {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        success(@"SDP OFFER");
-    });
-}
-
-- (BOOL)sendDTMF:(NSString * _Nonnull)tones {
-    return YES;
-}
-
-
-- (BOOL)sendDTMF:(NSString * _Nonnull)tones duration:(NSUInteger)duration interToneGap:(NSUInteger)interToneGap {
-    return YES;
 }
 
 @end

@@ -75,10 +75,35 @@
             return;
         }
 
-        [self sendReaction:reaction forEvent:eventId inRoom:roomId success:success failure:^(NSError *error) {
-            [self didOperationCompleteForReaction:reaction forEvent:eventId isAdd:YES];
-            failure(error);
-        }];
+//        [self.mxSession.matrixRestClient sendRelationToEvent:eventId
+//                                                      inRoom:roomId
+//                                                relationType:MXEventRelationTypeAnnotation
+//                                                   eventType:kMXEventTypeStringReaction
+//                                                  parameters:@{
+//                                                               @"key": reaction
+//                                                               }
+//                                                     content:@{}
+//                                                     success:^(NSString *eventId)
+//         {
+//             success();
+//         } failure:^(NSError *error)
+//         {
+//             MXStrongifyAndReturnIfNil(self);
+//
+//             MXError *mxError = [[MXError alloc] initWithNSError:error];
+//             if ([mxError.errcode isEqualToString:kMXErrCodeStringUnrecognized])
+//             {
+                 [self sendReactionUsingHack:reaction forEvent:eventId inRoom:roomId success:success failure:^(NSError *error) {
+                     [self didOperationCompleteForReaction:reaction forEvent:eventId isAdd:YES];
+                     failure(error);
+                 }];
+//             }
+//             else
+//             {
+//                 [self didOperationCompleteForReaction:reaction forEvent:eventId isAdd:YES];
+//                 failure(error);
+//             }
+//         }];
     }];
 }
 
@@ -111,14 +136,14 @@
             }
             else
             {
-                MXLogDebug(@"[MXAggregations] removeReaction: ERROR: Unknown room %@", roomId);
+                NSLog(@"[MXAggregations] removeReaction: ERROR: Unknown room %@", roomId);
                 [self didOperationCompleteForReaction:reaction forEvent:eventId isAdd:NO];
                 success();
             }
         }
         else
         {
-            MXLogDebug(@"[MXAggregations] removeReaction: ERROR: Do not know reaction(%@) event on event %@", reaction, eventId);
+            NSLog(@"[MXAggregations] removeReaction: ERROR: Do not know reaction(%@) event on event %@", reaction, eventId);
             [self didOperationCompleteForReaction:reaction forEvent:eventId isAdd:NO];
             success();
         }
@@ -134,7 +159,8 @@
 
     if (!reactions)
     {
-        reactions = [self reactionCountsOnEvent:eventId inRoom:roomId];
+        // Check reaction data from the hack
+        reactions = [self reactionCountsUsingHackOnEvent:eventId inRoom:roomId];
     }
 
     // Count local echoes too
@@ -214,7 +240,7 @@
 {
     NSString *parentEventId = event.relatesTo.eventId;
     NSString *reaction = event.relatesTo.key;
-    
+
     if (parentEventId && reaction)
     {
         // Manage aggregated reactions only for events in timelines we have
@@ -230,13 +256,12 @@
         }
         else
         {
-            // We need to store all received relations even if we do not know the event yet
-            [self storeRelationForReaction:reaction forEvent:parentEventId reactionEvent:event];
+            [self storeRelationForHackForReaction:reaction forEvent:parentEventId reactionEvent:event];
         }
     }
     else
     {
-        MXLogDebug(@"[MXAggregations] handleReaction: ERROR: invalid reaction event: %@", event.JSONDictionary);
+        NSLog(@"[MXAggregations] handleReaction: ERROR: invalid reaction event: %@", event.JSONDictionary);
     }
 }
 
@@ -286,7 +311,7 @@
     }
 
     // Migrate data from matrix store to aggregation store if needed
-    [self checkAggregationStoreForEvent:eventId inRoomId:reactionEvent.roomId];
+    [self checkAggregationStoreWithHackForEvent:eventId inRoomId:reactionEvent.roomId];
 
     // Create or update the current reaction count if it exists
     MXReactionCount *reactionCount = [self.store reactionCountForReaction:reaction onEvent:eventId];
@@ -321,7 +346,7 @@
 - (void)removeReaction:(NSString*)reaction onEvent:(NSString*)eventId inRoomId:(NSString*)roomId reactionEventId:(NSString*)reactionEventId
 {
     // Migrate data from matrix store to aggregation store if needed
-    [self checkAggregationStoreForEvent:eventId inRoomId:roomId];
+    [self checkAggregationStoreWithHackForEvent:eventId inRoomId:roomId];
 
     // Create or update the current reaction count if it exists
     MXReactionCount *reactionCount = [self.store reactionCountForReaction:reaction onEvent:eventId];
@@ -458,8 +483,8 @@
         if (self.reactionOperations[eventId][reaction].lastObject.isAddOperation == isAdd)
         {
             // The same operation is already pending
-            MXLogDebug(@"[MXAggregations] addOperationForReaction: Debounce same reaction operation: %@",
-                       isAdd ? @"ADD" : @"REMOVE");
+            NSLog(@"[MXAggregations] addOperationForReaction: Debounce same reaction operation: %@",
+                  isAdd ? @"ADD" : @"REMOVE");
             [self notifyReactionCountChangeListenersOfRoom:roomId forLocalEchoForOperation:reactionOperation];
             block(YES);
             return;
@@ -467,8 +492,8 @@
         else if (self.reactionOperations[eventId][reaction].count > 1)
         {
             // The app requires 3 binary switch operations, keep only the pending first one
-            MXLogDebug(@"[MXAggregations] addOperationForReaction: Debounce: do only the reaction operation: %@",
-                       isAdd ? @"ADD" : @"REMOVE");
+            NSLog(@"[MXAggregations] addOperationForReaction: Debounce: do only the reaction operation: %@",
+                  isAdd ? @"ADD" : @"REMOVE");
             [self.reactionOperations[eventId][reaction] removeObjectAtIndex:1];
             [self notifyReactionCountChangeListenersOfRoom:roomId forLocalEchoForOperation:reactionOperation];
             block(YES);
@@ -606,46 +631,47 @@
 }
 
 
-#pragma mark - Reactions
+#pragma mark - Reactions hack (TODO: Remove all methods) -
+/// TODO: To remove once the feature has landed on matrix.org homeserver
 
-- (MXHTTPOperation*)sendReaction:(NSString*)reaction
-                        forEvent:(NSString*)eventId
-                          inRoom:(NSString*)roomId
-                         success:(void (^)(void))success
-                         failure:(void (^)(NSError *error))failure
+// SendReactionUsingHack directly sends a `m.reaction` room message instead of using the `/send_relation` api.
+- (MXHTTPOperation*)sendReactionUsingHack:(NSString*)reaction
+                                 forEvent:(NSString*)eventId
+                                   inRoom:(NSString*)roomId
+                                  success:(void (^)(void))success
+                                  failure:(void (^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXAggregations] sendReaction");
+    NSLog(@"[MXAggregations] sendReactionUsingHack");
 
     MXRoom *room = [self.mxSession roomWithRoomId:roomId];
     if (!room)
     {
-        MXLogErrorDetails(@"[MXAggregations] sendReaction Error: Unknown room", @{
-            @"room_id": roomId ?: @"unknown"
-        });
+        NSLog(@"[MXAggregations] sendReactionUsingHack Error: Unknown room: %@", roomId);
         return nil;
     }
 
     NSDictionary *reactionContent = @{
-        kMXEventRelationRelatesToKey: @{
-            kMXEventContentRelatesToKeyRelationType: MXEventRelationTypeAnnotation,
-            kMXEventContentRelatesToKeyEventId: eventId,
-            kMXEventContentRelatesToKeyKey: reaction
-        }
-    };
+                                      @"m.relates_to": @{
+                                              @"rel_type": @"m.annotation",
+                                              @"event_id": eventId,
+                                              @"key": reaction
+                                              }
+                                      };
 
-    return [room sendEventOfType:kMXEventTypeStringReaction content:reactionContent threadId:nil localEcho:nil success:^(NSString *eventId) {
+    return [room sendEventOfType:kMXEventTypeStringReaction content:reactionContent localEcho:nil success:^(NSString *eventId) {
         success();
     } failure:failure];
 }
 
 
-// Build reaction count from known relations
-- (void)checkAggregationStoreForEvent:(NSString*)eventId inRoomId:(NSString*)roomId
+// If not already done, run the hack: build reaction count from known relations
+- (void)checkAggregationStoreWithHackForEvent:(NSString*)eventId inRoomId:(NSString*)roomId
 {
     if (![self.store hasReactionCountsOnEvent:eventId])
     {
-        NSArray<MXReactionCount*> *reactions = [self reactionCountsOnEvent:eventId inRoom:roomId];
-        
+        // Check reaction data from the hack
+        NSArray<MXReactionCount*> *reactions = [self reactionCountsUsingHackOnEvent:eventId inRoom:roomId];
+
         if (reactions)
         {
             [self.store setReactionCounts:reactions onEvent:eventId inRoom:roomId];
@@ -654,7 +680,8 @@
 }
 
 // Compute reactions counts from relations we know
-- (nullable NSArray<MXReactionCount*> *)reactionCountsOnEvent:(NSString*)eventId inRoom:(NSString*)roomId
+// Note: This is not accurate and will be removed soon
+- (nullable NSArray<MXReactionCount*> *)reactionCountsUsingHackOnEvent:(NSString*)eventId inRoom:(NSString*)roomId
 {
     NSMutableDictionary<NSString*, MXReactionCount*> *reactionCountDict;
 
@@ -708,6 +735,12 @@
     sortDescriptor = [[NSSortDescriptor alloc] initWithKey:@"originServerTs" ascending:YES];
     NSArray *sortedArray = [reactionCounts sortedArrayUsingDescriptors:@[sortDescriptor]];
     return sortedArray;
+}
+
+// We need to store all received relations even if we do not know the event yet
+- (void)storeRelationForHackForReaction:(NSString*)reaction forEvent:(NSString*)eventId reactionEvent:(MXEvent *)reactionEvent
+{
+    [self storeRelationForReaction:reaction forEvent:eventId reactionEvent:reactionEvent];
 }
 
 @end

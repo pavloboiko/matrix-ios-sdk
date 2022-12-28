@@ -37,27 +37,6 @@ public enum MXAccountDataType: Equatable, Hashable {
     }
 }
 
-/// Represents the threads request include parameter
-public enum MXThreadsIncludeParameter: String, RawRepresentable, Equatable, Hashable {
-    case all
-    case participated
-    
-    public init?(rawValue: String) {
-        switch rawValue {
-        case kMXThreadsListIncludeAllParameter:             self = .all
-        case kMXThreadsListIncludeParticipatedParameter:    self = .participated
-        default:
-            return nil
-        }
-    }
-    
-    public var rawValue: String {
-        switch self {
-        case .all:               return kMXThreadsListIncludeAllParameter
-        case .participated:      return kMXThreadsListIncludeParticipatedParameter
-        }
-    }
-}
 
 
 
@@ -96,7 +75,7 @@ public extension MXRestClient {
      
      - returns: a `MXRestClient` instance.
      */
-    @nonobjc required convenience init(homeServer: URL, unrecognizedCertificateHandler handler: MXHTTPClientOnUnrecognizedCertificate?) {
+    @nonobjc convenience init(homeServer: URL, unrecognizedCertificateHandler handler: MXHTTPClientOnUnrecognizedCertificate?) {
         self.init(__homeServer: homeServer.absoluteString, andOnUnrecognizedCertificateBlock: handler)
     }
     
@@ -109,8 +88,8 @@ public extension MXRestClient {
      
      - returns: a `MXRestClient` instance.
      */
-    @nonobjc convenience init(credentials: MXCredentials, unrecognizedCertificateHandler handler: MXHTTPClientOnUnrecognizedCertificate? = nil, persistentTokenDataHandler: MXRestClientPersistTokenDataHandler? = nil, unauthenticatedHandler: MXRestClientUnauthenticatedHandler? = nil) {
-        self.init(__credentials: credentials, andOnUnrecognizedCertificateBlock: handler, andPersistentTokenDataHandler: persistentTokenDataHandler, andUnauthenticatedHandler: unauthenticatedHandler)
+    @nonobjc convenience init(credentials: MXCredentials, unrecognizedCertificateHandler handler: MXHTTPClientOnUnrecognizedCertificate?) {
+        self.init(__credentials: credentials, andOnUnrecognizedCertificateBlock: handler)
     }
 
     
@@ -128,23 +107,8 @@ public extension MXRestClient {
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @available(*, deprecated, message: "Use isUsernameAvailable instead which calls the dedicated API and provides more information.")
     @nonobjc @discardableResult func isUserNameInUse(_ username: String, completion: @escaping (_ inUse: Bool) -> Void) -> MXHTTPOperation {
         return __isUserName(inUse: username, callback: completion)
-    }
-    
-    /**
-     Checks whether a username is available.
-     
-     - parameters:
-         - username: The user name to test.
-         - completion: A block object called when the operation is completed.
-         - response: Provides the server response as an `MXUsernameAvailability` instance.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func isUsernameAvailable(_ username: String, completion: @escaping (_ response: MXResponse<MXUsernameAvailability>) -> Void) -> MXHTTPOperation {
-        return __isUsernameAvailable(username, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     /**
@@ -287,9 +251,6 @@ public extension MXRestClient {
         return URL(string: fallbackString)!
     }
 
-    @nonobjc func generateLoginToken(withCompletion completion: @escaping (_ response: MXResponse<MXLoginToken>) -> Void) -> MXHTTPOperation {
-        return __generateLoginToken(success: currySuccess(completion), failure: curryFailure(completion))
-    }
     
     /**
      Reset the account password.
@@ -312,14 +273,13 @@ public extension MXRestClient {
      - parameters:
          - old: the current password to update.
          - new: the new password.
-         - logoutDevices flag to log out all devices
          - completion: A block object called when the operation completes
          - response: indicates whether the operation succeeded or not.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func changePassword(from old: String, to new: String, logoutDevices: Bool, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __changePassword(old, with: new, logoutDevices: logoutDevices, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func changePassword(from old: String, to new: String, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
+        return __changePassword(old, with: new, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     
@@ -400,15 +360,13 @@ public extension MXRestClient {
         - profileTag: The profile tag for this device. Identifies this device in push rules.
         - lang: The user's preferred language for push, eg. 'en' or 'en-US'
         - data: Dictionary of data as required by your push gateway (generally the notification URI and aps-environment for APNS).
-        - append: If `true`, the homeserver should add another pusher with the given pushkey and App ID in addition to any others with different user IDs.
-        - enabled: Whether the pusher should actively create push notifications
         - completion: A block object called when the operation succeeds.
         - response: indicates whether the request succeeded or not.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func setPusher(pushKey: String, kind: MXPusherKind, appId: String, appDisplayName: String, deviceDisplayName: String, profileTag: String, lang: String, data: [String: Any], append: Bool, enabled: Bool = true, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __setPusherWithPushkey(pushKey, kind: kind.objectValue, appId: appId, appDisplayName: appDisplayName, deviceDisplayName: deviceDisplayName, profileTag: profileTag, lang: lang, data: data, append: append, enabled: enabled, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func setPusher(pushKey: String, kind: MXPusherKind, appId: String, appDisplayName: String, deviceDisplayName: String, profileTag: String, lang: String, data: [String: Any], append: Bool, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
+        return __setPusherWithPushkey(pushKey, kind: kind.objectValue, appId: appId, appDisplayName: appDisplayName, deviceDisplayName: deviceDisplayName, profileTag: profileTag, lang: lang, data: data, append: append, success: currySuccess(completion), failure: curryFailure(completion))
     }
     // TODO: setPusherWithPushKey - futher refinement
     /*
@@ -418,18 +376,7 @@ public extension MXRestClient {
      Something like "MXPusherDescriptor"?
      */
     
-    /**
-     Gets all currently active pushers for the authenticated user.
-     
-     - parameters:
-        - response: indicates whether the request succeeded or not.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func pushers(completion: @escaping (_ response: MXResponse<[MXPusher]>) -> Void) -> MXHTTPOperation {
-        return __pushers(currySuccess(completion), failure: curryFailure(completion))
-    }
-
+    
     /**
      Get all push notifications rules.
      
@@ -544,7 +491,6 @@ public extension MXRestClient {
      
      - parameters:
         - roomId: the id of the room.
-        - threadId: the id of the thread to send the message. nil by default.
         - eventType: the type of the event.
         - content: the content that will be sent to the server as a JSON object.
         - txnId: the transaction id to use. If nil, one will be generated
@@ -554,8 +500,8 @@ public extension MXRestClient {
      - returns: a `MXHTTPOperation` instance.
      
      */
-    @nonobjc @discardableResult func sendEvent(toRoom roomId: String, threadId: String? = nil, eventType: MXEventType, content: [String: Any], txnId: String?, completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
-        return __sendEvent(toRoom: roomId, threadId: threadId, eventType: eventType.identifier, content: content, txnId: txnId, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func sendEvent(toRoom roomId: String, eventType: MXEventType, content: [String: Any], txnId: String?, completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
+        return __sendEvent(toRoom: roomId, eventType: eventType.identifier, content: content, txnId: txnId, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     
@@ -581,7 +527,6 @@ public extension MXRestClient {
      
      - parameters:
         - roomId: the id of the room.
-        - threadId: the id of the thread to send the message. nil by default.
         - messageType: the type of the message.
         - content: the message content that will be sent to the server as a JSON object.
         - completion: A block object called when the operation completes. 
@@ -589,8 +534,8 @@ public extension MXRestClient {
      
      -returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func sendMessage(toRoom roomId: String, threadId: String? = nil, messageType: MXMessageType, content: [String: Any], completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
-        return __sendMessage(toRoom: roomId, threadId: threadId, msgType: messageType.identifier, content: content, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func sendMessage(toRoom roomId: String, messageType: MXMessageType, content: [String: Any], completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
+        return __sendMessage(toRoom: roomId, msgType: messageType.identifier, content: content, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     
@@ -599,15 +544,14 @@ public extension MXRestClient {
      
      - parameters:
         - roomId: the id of the room.
-        - threadId: the id of the thread to send the message. nil by default.
         - text: the text to send.
         - completion: A block object called when the operation completes.
         - response: Provides the event id of the event generated on the home server on success.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func sendTextMessage(toRoom roomId: String, threadId: String? = nil, text: String, completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
-        return __sendTextMessage(toRoom: roomId, threadId: threadId, text: text, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func sendTextMessage(toRoom roomId: String, text: String, completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
+        return __sendTextMessage(toRoom: roomId, text: text, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     
@@ -736,37 +680,43 @@ public extension MXRestClient {
         return __historyVisibility(ofRoom: roomId, success: currySuccess(transform: MXRoomHistoryVisibility.init, completion), failure: curryFailure(completion))
     }
     
+    
+    
+    
+    
+    
+    
     /**
      Set the join rule of a room.
      
      - parameters:
-        - joinRule: the rule to set.
         - roomId: the id of the room.
-        - allowedParentIds: Optional: list of allowedParentIds (required only for `restricted` join rule as per [MSC3083](https://github.com/matrix-org/matrix-doc/pull/3083) )
+        - joinRule: the rule to set.
         - completion: A block object called when the operation completes.
         - response: Indicates whether the operation was successful.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func setRoomJoinRule(_ joinRule: MXRoomJoinRule, forRoomWithId roomId: String, allowedParentIds: [String]?, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __setRoomJoinRule(joinRule.identifier, forRoomWithId: roomId, allowedParentIds: allowedParentIds, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func setJoinRule(ofRoom roomId: String, joinRule: MXRoomJoinRule, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
+        return __setRoomJoinRule(roomId, joinRule: joinRule.identifier, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     /**
-     Get the enhanced join rule of a room.
-
+     Get the join rule of a room.
+     
      - parameters:
         - roomId: the id of the room.
-        - completion: A block object called when the operation completes. It provides the room enhanced join rule as per [MSC3083](https://github.com/matrix-org/matrix-doc/pull/3083.
+        - completion: A block object called when the operation completes.
         - response: Provides the room join rule on success.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func joinRule(ofRoomWithId roomId: String, completion: @escaping (_ response: MXResponse<MXRoomJoinRuleResponse>) -> Void) -> MXHTTPOperation {
-        return __joinRuleOfRoom(withId: roomId, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func joinRule(ofRoom roomId: String, completion: @escaping (_ response: MXResponse<MXRoomJoinRule>) -> Void) -> MXHTTPOperation {
+        return __joinRule(ofRoom: roomId, success: currySuccess(transform: MXRoomJoinRule.init, completion), failure: curryFailure(completion))
     }
-
-
+    
+    
+    
     
     /**
      Set the guest access of a room.
@@ -1071,7 +1021,7 @@ public extension MXRestClient {
         } else {
             _limit = -1;
         }
-        return __messages(forRoom: roomId, from: from, direction: direction, limit: _limit, filter: filter, success: currySuccess(completion), failure: curryFailure(completion))
+        return __messages(forRoom: roomId, from: from, direction: direction.identifier, limit: UInt(_limit), filter: filter, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     /**
@@ -1245,53 +1195,8 @@ public extension MXRestClient {
     @nonobjc @discardableResult func context(ofEvent eventId: String, inRoom roomId: String, limit: UInt, filter: MXRoomEventFilter? = nil, completion: @escaping (_ response: MXResponse<MXEventContext>) -> Void) -> MXHTTPOperation {
         return __context(ofEvent: eventId, inRoom: roomId, limit: limit, filter:filter, success: currySuccess(completion), failure: curryFailure(completion))
     }
-
-    /**
-     Get the summary of a room
-     
-     - parameters:
-        - roomIdOrAlias: the id of the room or its alias
-        - via: servers, that should be tried to request a summary from, if it can't be generated locally. These can be from a matrix URI, matrix.to link or a `m.space.child` event for example.
-        - completion: A block object called when the operation completes.
-        - response: Provides the model created from the homeserver JSON response on success.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func roomSummary(with roomIdOrAlias: String, via: [String], completion: @escaping (_ response: MXResponse<MXPublicRoom>) -> Void) -> MXHTTPOperation {
-        return __roomSummary(with: roomIdOrAlias, via: via, success: currySuccess(completion), failure: curryFailure(completion))
-    }
     
-    /**
-     List all the threads of a room.
-     
-     - parameters:
-        - roomId: the id of the room.
-        - include: wether the response should include all threads (e.g. `.all`) or only threads participated by the user (e.g. `.participated`)
-        - from: the token to pass for doing pagination from a previous response.
-        - completion: A block object called when the operation completes.
-        - response: Provides the list of root events of the threads and, optionally, the next batch token.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func threadsInRoomWithId(_ roomId: String, include: MXThreadsIncludeParameter, from: String?, completion: @escaping (_ response: MXResponse<MXAggregationPaginatedResponse>) -> Void) -> MXHTTPOperation {
-        return __threadsInRoom(withId: roomId, include: include.rawValue, from: from,  success: currySuccess(completion), failure: curryFailure(completion))
-    };
     
-    /**
-     Upgrade a room to a new version
-     
-     - parameters:
-        - roomId: the id of the room.
-        - roomVersion: the new room version
-        - completion: A block object called when the operation completes.
-        - response: Provides the ID of the replacement room on success.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func upgradeRoom(withId roomId: String, to roomVersion: String, completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
-        return __upgradeRoom(withId: roomId, to: roomVersion, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-
     // MARK: - Room tags operations
     
     /**
@@ -1343,68 +1248,10 @@ public extension MXRestClient {
         return __removeTag(tag, fromRoom: roomId, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
-    // MARK: -  Room account data operations
     
-    /**
-     Update the tagged events
-     
-     - parameters:
-        - roomId: the id of the room.
-        - content: the new tagged events content.
-        - completion: A block object called when the operation completes.
-        - response: Indicates whether the operation was successful.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func updateTaggedEvents(_ roomId: String, withContent content: MXTaggedEvents, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __updateTaggedEvents(roomId, withContent: content, success: currySuccess(completion), failure: curryFailure(completion))
-    }
     
-    /**
-     Get the tagged events of a room
-     
-     - parameters:
-        - roomId: the id of the room.
-        - completion: A block object called when the operation completes.
-        - response: Provides a `MXTaggedEvents` object on success.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func getTaggedEvents(_ roomId: String, completion: @escaping (_ response: MXResponse<MXTaggedEvents>) -> Void) -> MXHTTPOperation {
-        return __getTaggedEvents(roomId, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-
-    /**
-     Set a dedicated room account data field
-     
-     - parameters:
-        - roomId: the id of the room.
-        - eventTypeString: the type of the event. @see MXEventType.
-        - content: the event content.
-        - completion: A block object called when the operation completes.
-        - response: Indicates whether the operation was successful.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func setRoomAccountData(_ roomId: String, eventType eventTypeString: String, withParameters content: [String: Any], completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __setRoomAccountData(roomId, eventType: eventTypeString, withParameters: content, success: currySuccess(completion), failure: curryFailure(completion))
-    }
     
-    /**
-     Get the room account data field
-     
-     - parameters:
-        - roomId: the id of the room.
-        - eventTypeString: the type of the event. @see MXEventType.
-        - completion: A block object called when the operation completes.
-        - response: Provides the raw JSON response from the server.
-     
-     - returns: a `MXHTTPOperation` instance.
-     */
-    @nonobjc @discardableResult func getRoomAccountData(_ roomId: String, eventType eventTypeString: String, completion: @escaping (_ response: MXResponse<[String: Any]>) -> Void) -> MXHTTPOperation {
-        return __getRoomAccountData(roomId, eventType: eventTypeString, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-
+    
     // MARK: - Profile operations
     
     /**
@@ -1699,17 +1546,17 @@ public extension MXRestClient {
     }
     
     /**
-     Resolve given room alias to a room identifier and a list of servers aware of this identifier
-
+     Get the room ID corresponding to this room alias
+     
      - parameters:
         - roomAlias: the alias of the room to look for.
         - completion: A block object called when the operation completes.
-        - response: Provides a resolution object containing the room ID and a list of servers
-
+        - response: Provides the the ID of the room on success.
+     
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func resolveRoomAlias(_ roomAlias: String, completion: @escaping (_ response: MXResponse<MXRoomAliasResolution>) -> Void) -> MXHTTPOperation {
-        return __resolveRoomAlias(roomAlias, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func roomId(forRoomAlias roomAlias: String, completion: @escaping (_ response: MXResponse<String>) -> Void) -> MXHTTPOperation {
+        return __roomID(forRoomAlias: roomAlias, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     // Mark: - Media Repository API
@@ -1767,14 +1614,13 @@ public extension MXRestClient {
      - parameters:
         - roomId: the id of the room.
         - eventId: the id of the event.
-        - threadId: the id of the thread (`nil` for unthreaded RR)
         - completion: A block object called when the operation completes.
         - response: Indicates whether the operation was successful.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func sendReadReceipt(toRoom roomId: String, forEvent eventId: String, threadId: String?, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __sendReadReceipt(roomId, eventId: eventId, threadId: threadId, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func sendReadReceipt(toRoom roomId: String, forEvent eventId: String, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
+        return __sendReadReceipt(roomId, eventId: eventId, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     
@@ -1823,14 +1669,14 @@ public extension MXRestClient {
      - parameters:
         - deviceKeys: the device keys to send.
         - oneTimeKeys: the one-time keys to send.
-        - fallbackKeys: the fallback keys to send
+        - deviceId: the explicit device_id to use for upload (pass `nil` to use the same as that used during auth).
         - completion: A block object called when the operation completes.
         - response: Provides information about the keys on success.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func uploadKeys(_ deviceKeys: [String: Any]?, oneTimeKeys: [String: Any]?, fallbackKeys: [String: Any]?, forDevice deviceId: String? = nil, completion: @escaping (_ response: MXResponse<MXKeysUploadResponse>) -> Void) -> MXHTTPOperation {
-        return __uploadKeys(deviceKeys, oneTimeKeys: oneTimeKeys, fallbackKeys: fallbackKeys, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func uploadKeys(_ deviceKeys: [String: Any], oneTimeKeys: [String: Any], forDevice deviceId: String? = nil, completion: @escaping (_ response: MXResponse<MXKeysUploadResponse>) -> Void) -> MXHTTPOperation {
+        return __uploadKeys(deviceKeys, oneTimeKeys: oneTimeKeys, forDevice: deviceId, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     /**
@@ -1864,20 +1710,22 @@ public extension MXRestClient {
     }
     
     
+    
     // MARK: - Direct-to-device messaging
     
     /**
      Send an event to a specific list of devices
      
      - paramaeters:
-        - payload: Payload with `eventType` and `contentMap` to be sent
+        - eventType: the type of event to send
+        - contentMap: content to send. Map from user_id to device_id to content dictionary.
         - completion: A block object called when the operation completes.
         - response: Indicates whether the operation was successful.
      
      - returns: a `MXHTTPOperation` instance.
      */
-    @nonobjc @discardableResult func sendDirectToDevice(payload: MXToDevicePayload, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __send(toDevice: payload, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc @discardableResult func sendDirectToDevice(eventType: String, contentMap: MXUsersDevicesMap<NSDictionary>, txnId: String, completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
+        return __send(toDevice: eventType, contentMap: contentMap, txnId: txnId, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
     
@@ -1957,85 +1805,4 @@ public extension MXRestClient {
         return __deleteDevice(byDeviceId: deviceId, authParams: authParameters, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
-    /**
-     Deletes the given devices, and invalidates any access token associated with them.
-     
-     @discussion This API endpoint uses the User-Interactive Authentication API.
-     
-     @param deviceIds The identifiers for devices.
-     @param authParameters The additional authentication information for the user-interactive authentication API.
-     @param success A block object called when the operation succeeds.
-     @param failure A block object called when the operation fails.
-     
-     @return a MXHTTPOperation instance.
-     */
-    @nonobjc @discardableResult func deleteDevices(_ deviceIds: [String], authParameters: [String: Any], completion: @escaping (_ response: MXResponse<Void>) -> Void) -> MXHTTPOperation {
-        return __deleteDevices(byDeviceIds: deviceIds, authParams: authParameters, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-    
-    // MARK: - Spaces
-    
-    /// Get the space children of a given space.
-    /// - Parameters:
-    ///   - spaceId: The room id of the queried space.
-    ///   - suggestedOnly: If `true`, return only child events and rooms where the `m.space.child` event has `suggested: true`.
-    ///   - limit: Optional. A limit to the maximum number of children to return per space. `-1` for no limit
-    ///   - maxDepth: Optional. The maximum depth in the tree (from the root room) to return. `-1` for no limit
-    ///   - paginationToken: Optional. Pagination token given to retrieve the next set of rooms.
-    ///   - parameters: Space children request parameters.
-    ///   - completion: A closure called when the operation completes.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func getSpaceChildrenForSpace(withId spaceId: String, suggestedOnly: Bool, limit: Int?, maxDepth: Int?, paginationToken: String?, completion: @escaping (_ response: MXResponse<MXSpaceChildrenResponse>) -> Void) -> MXHTTPOperation {
-        return __getSpaceChildrenForSpace(withId: spaceId, suggestedOnly: suggestedOnly, limit: limit ?? -1, maxDepth: maxDepth ?? -1, paginationToken: paginationToken, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-    
-    // MARK: - Home server capabilities
-    
-    /// Get the capabilities of the homeserver
-    /// - Parameters:
-    ///   - completion: A closure called when the operation completes.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func homeServerCapabilities(completion: @escaping (_ response: MXResponse<MXHomeserverCapabilities>) -> Void) -> MXHTTPOperation {
-        return __homeServerCapabilities(success: currySuccess(completion), failure: curryFailure(completion))
-    }
-
-    //  MARK: - Aggregations
-    
-    /// Get relations for a given event.
-    /// - Parameters:
-    ///   - eventId: the id of the event
-    ///   - roomId: the id of the room
-    ///   - relationType: Optional. The type of relation
-    ///   - eventType: Optional. Event type to filter by
-    ///   - from: Optional. The token to start getting results from
-    ///   - direction: direction from the token
-    ///   - limit: Optional. The maximum number of messages to return
-    ///   - completion: A closure called when the operation completes.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func relations(forEvent eventId: String,
-                                               inRoom roomId: String,
-                                               relationType: String?,
-                                               eventType: String?,
-                                               from: String?,
-                                               direction: MXTimelineDirection,
-                                               limit: UInt?,
-                                               completion: @escaping (_ response: MXResponse<MXAggregationPaginatedResponse>) -> Void) -> MXHTTPOperation {
-        let _limit: Int
-        if let limit = limit {
-            _limit = Int(limit)
-        } else {
-            _limit = -1
-        }
-        return __relations(forEvent: eventId, inRoom: roomId, relationType: relationType, eventType: eventType, from: from, direction: direction, limit: _limit, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-
-    // MARK: - Versions
-
-    /// Get the supported versions of the homeserver
-    /// - Parameters:
-    ///   - completion: A closure called when the operation completes.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func supportedMatrixVersions(completion: @escaping (_ response: MXResponse<MXMatrixVersions>) -> Void) -> MXHTTPOperation {
-        return __supportedMatrixVersions(currySuccess(completion), failure: curryFailure(completion))
-    }
 }

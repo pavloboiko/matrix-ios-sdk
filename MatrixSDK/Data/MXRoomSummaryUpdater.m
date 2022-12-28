@@ -22,22 +22,9 @@
 #import "MXSession.h"
 #import "MXRoom.h"
 #import "MXSession.h"
-#import "MXRoomNameDefaultStringLocalizer.h"
-#import "MXBeaconInfo.h"
-
-#import "NSArray+MatrixSDK.h"
-
-#import "MatrixSDKSwiftHeader.h"
-
-@interface MXRoomSummaryUpdater()
-
-@property (nonatomic) MXRoomTypeMapper *roomTypeMapper;
-
-@end
+#import "MXRoomNameDefaultStringLocalizations.h"
 
 @implementation MXRoomSummaryUpdater
-
-#pragma mark - Setup
 
 + (instancetype)roomSummaryUpdaterForSession:(MXSession *)mxSession
 {
@@ -45,9 +32,7 @@
 
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        updaterPerSession = [[NSMapTable alloc] initWithKeyOptions:NSPointerFunctionsWeakMemory
-                                                      valueOptions:NSPointerFunctionsWeakMemory
-                                                          capacity:1];
+        updaterPerSession = [[NSMapTable alloc] init];
     });
 
     MXRoomSummaryUpdater *updater = [updaterPerSession objectForKey:mxSession];
@@ -60,29 +45,6 @@
     return updater;
 }
 
-- (instancetype)init
-{
-    self = [super init];
-    if (self)
-    {
-        _showNilOrEmptyRoomType = YES;
-        _defaultRoomType = MXRoomTypeRoom;
-        _roomTypeMapper = [[MXRoomTypeMapper alloc] initWithDefaultRoomType:_defaultRoomType];
-    }
-    return self;
-}
-
-#pragma mark - Properties
-
-- (void)setDefaultRoomType:(MXRoomType)defaultRoomType
-{
-    if (_defaultRoomType != defaultRoomType)
-    {
-        _defaultRoomType = defaultRoomType;
-        
-        self.roomTypeMapper.defaultRoomType = defaultRoomType;
-    }
-}
 
 #pragma mark - MXRoomSummaryUpdating
 
@@ -91,10 +53,10 @@
     // Do not show redaction events
     if (event.eventType == MXEventTypeRoomRedaction)
     {
-        if ([event.redacts isEqualToString:summary.lastMessage.eventId])
+        if ([event.redacts isEqualToString:summary.lastMessageEventId])
         {
             [summary resetLastMessage:nil failure:^(NSError *error) {
-                MXLogDebug(@"[MXRoomSummaryUpdater] updateRoomSummary: Cannot reset last message after redaction. Room: %@", summary.roomId);
+                NSLog(@"[MXRoomSummaryUpdater] updateRoomSummary: Cannot reset last message after redaction. Room: %@", summary.roomId);
             } commit:YES];
         }
         return NO;
@@ -102,11 +64,6 @@
     else if (event.isEditEvent)
     {
         // Do not display update events in the summary
-        return NO;
-    }
-    else if (event.isInThread)
-    {
-        // do not display thread events in the summary
         return NO;
     }
 
@@ -119,21 +76,12 @@
     BOOL updated = NO;
 
     // Accept event which type is in the filter list
-    // Only accept membership join or invite from current user but not profile changes
-    // TODO: Add a flag if needed to configure membership event filtering 
-    if (event.eventId 
-        && [self isEventTypeAllowedAsLastMessage:event.type]
-        && (event.eventType != MXEventTypeRoomMember || [self isMembershipEventAllowedAsLastMessage:event forUserId:session.myUserId]))
+    if (event.eventId && (!_eventsFilterForMessages || (NSNotFound != [_eventsFilterForMessages indexOfObject:event.type])))
     {
-        [summary updateLastMessage:[[MXRoomLastMessage alloc] initWithEvent:event]];
-        updated = YES;
-    }
-    else if ([event.type isEqualToString:kRoomIsVirtualJSONKey] && !summary.hiddenFromUser)
-    {
-        MXVirtualRoomInfo *virtualRoomInfo = [MXVirtualRoomInfo modelFromJSON:event.content];
-        if (virtualRoomInfo.isVirtual)
+        // Accept event related to profile change only if the flag is NO
+        if (!_ignoreMemberProfileChanges || !event.isUserProfileChange)
         {
-            summary.hiddenFromUser = YES;
+            summary.lastMessageEvent = event;
             updated = YES;
         }
     }
@@ -145,9 +93,7 @@
 {
     BOOL hasRoomMembersChange = NO;
     BOOL updated = NO;
-    
-    NSMutableSet<NSString*>* userIdsSharingLiveBeacon = [summary.userIdsSharingLiveBeacon mutableCopy] ?: [NSMutableSet new] ;
-    
+
     for (MXEvent *event in stateEvents)
     {
         switch (event.eventType)
@@ -168,17 +114,7 @@
                 break;
 
             case MXEventTypeRoomAliases:
-                if (summary.aliases.count == 0)
-                {
-                    //  if no aliases, just set it
-                    summary.aliases = roomState.aliases;
-                }
-                else
-                {
-                    //  We do a union here because can not be sure about the event type order.
-                    //  So a MXEventTypeRoomCanonicalAlias event might be came first and aliases array may contain it, we do not want to lose it.
-                    summary.aliases = [summary.aliases mx_unionArray:roomState.aliases];
-                }
+                summary.aliases = roomState.aliases;
                 updated = YES;
                 break;
 
@@ -188,18 +124,6 @@
                 {
                     summary.displayname = roomState.canonicalAlias;
                     updated = YES;
-                }
-                //  If canonicalAlias is set, add it to the aliases array
-                if (roomState.canonicalAlias && ![summary.aliases containsObject:roomState.canonicalAlias])
-                {
-                    if (summary.aliases.count == 0)
-                    {
-                        summary.aliases = @[roomState.canonicalAlias];
-                    }
-                    else
-                    {
-                        summary.aliases = [summary.aliases arrayByAddingObject:roomState.canonicalAlias];
-                    }
                 }
                 break;
 
@@ -222,44 +146,12 @@
             }
                 
             case MXEventTypeRoomCreate:
-            {
-                MXRoomCreateContent *createContent = [MXRoomCreateContent modelFromJSON:event.content];
-                summary.creatorUserId = roomState.creatorUserId;
-
-                NSString *roomTypeString = createContent.roomType;
-                
-                summary.roomTypeString = roomTypeString;
-                summary.roomType = [self.roomTypeMapper roomTypeFrom:roomTypeString];
-                                
-                if (!summary.hiddenFromUser && [self shouldHideRoomWithRoomTypeString:roomTypeString])
-                {
-                    summary.hiddenFromUser = YES;
-                }
-                
-                updated = YES;
-                [self checkRoomCreateStateEventPredecessorAndUpdateObsoleteRoomSummaryIfNeededWithCreateContent:createContent summary:summary session:session roomState:roomState];
-                [self checkRoomIsVirtualWithCreateEvent:event summary:summary session:session];
-                
+                [self checkRoomCreateStateEventPredecessorAndUpdateObsoleteRoomSummaryIfNeededWithCreateEvent:event summary:summary session:session roomState:roomState];
                 break;
-            }
-
-            case MXEventTypeBeaconInfo:
-            {
-                [self updateUserIdsSharingLiveBeacon:userIdsSharingLiveBeacon withStateEvent:event];
-                break;
-            }
-            case MXEventTypeRoomHistoryVisibility:
-                summary.historyVisibility = roomState.historyVisibility;
-                break;
+                
             default:
                 break;
         }
-    }
-    
-    if (![userIdsSharingLiveBeacon isEqualToSet:summary.userIdsSharingLiveBeacon])
-    {
-        summary.userIdsSharingLiveBeacon = userIdsSharingLiveBeacon;
-        updated = YES;
     }
 
     if (hasRoomMembersChange)
@@ -298,23 +190,6 @@
         updated = [self session:session updateRoomSummary:summary withServerRoomSummary:nil roomState:roomState];
     }
 
-    NSUInteger memberCount = roomState.membersCount.members;
-    if (memberCount > 1
-        && (!summary.displayname || [summary.displayname isEqualToString:_roomNameStringLocalizer.emptyRoom]))
-    {
-        // Data are missing to compute the display name
-        MXLogDebug(@"[MXRoomSummaryUpdater] updateRoomSummary: Computed an unexpected \"Empty Room\" name. memberCount: %@", @(memberCount));
-        summary.displayname = [self fixUnexpectedEmptyRoomDisplayname:memberCount
-                                                              session:session
-                                                            roomState:roomState];
-        updated = YES;
-    }
-
-    if (!summary.avatar)
-    {
-        updated = [self updateSummaryAvatar:summary session:session withServerRoomSummary:nil roomState:roomState];
-    }
-
     return updated;
 }
 
@@ -325,12 +200,6 @@
 // in this case it should be processed when checking the room replacement in `checkRoomCreateStateEventPredecessorAndUpdateObsoleteRoomSummaryIfNeeded:session:room:`.
 - (BOOL)checkForTombStoneStateEventAndUpdateRoomSummaryIfNeeded:(MXRoomSummary*)summary session:(MXSession*)session roomState:(MXRoomState*)roomState
 {
-    // If room is already hidden, do not check if we should hide it
-    if (summary.hiddenFromUser)
-    {
-        return NO;
-    }
-    
     BOOL updated = NO;
     
     MXRoomTombStoneContent *roomTombStoneContent = roomState.tombStoneContent;
@@ -341,13 +210,8 @@
         
         if (replacementRoomSummary)
         {
-            BOOL isReplacementRoomJoined = replacementRoomSummary.membership == MXMembershipJoin;
-                        
-            if (isReplacementRoomJoined)
-            {
-                summary.hiddenFromUser = YES;
-                updated = YES;                
-            }
+            summary.hiddenFromUser = replacementRoomSummary.membership == MXMembershipJoin;
+            updated = YES;
         }
     }
     
@@ -357,36 +221,21 @@
 // Hide tombstoned room predecessor from user only if the user joined the current room
 // Important: Room predecessor summary could not be present in memory when making this process,
 // in this case it should be processed when checking the room predecessor in `checkForTombStoneStateEventAndUpdateRoomSummaryIfNeeded:session:room:`.
-- (void)checkRoomCreateStateEventPredecessorAndUpdateObsoleteRoomSummaryIfNeededWithCreateContent:(MXRoomCreateContent*)createContent summary:(MXRoomSummary*)summary session:(MXSession*)session roomState:(MXRoomState*)roomState
+- (void)checkRoomCreateStateEventPredecessorAndUpdateObsoleteRoomSummaryIfNeededWithCreateEvent:(MXEvent*)createEvent summary:(MXRoomSummary*)summary session:(MXSession*)session roomState:(MXRoomState*)roomState
 {
+    MXRoomCreateContent *createContent = [MXRoomCreateContent modelFromJSON:createEvent.content];
+    
     if (createContent.roomPredecessorInfo)
     {
         MXRoomSummary *obsoleteRoomSummary = [session roomSummaryWithRoomId:createContent.roomPredecessorInfo.roomId];
+     
+        BOOL obsoleteRoomHiddenFromUserFormerValue = obsoleteRoomSummary.hiddenFromUser;
+        obsoleteRoomSummary.hiddenFromUser = summary.membership == MXMembershipJoin; // Hide room predecessor if user joined the new one
         
-        BOOL isRoomJoined = summary.membership == MXMembershipJoin; 
-        
-        // Hide room predecessor if user joined the new one
-        if (isRoomJoined && obsoleteRoomSummary.hiddenFromUser == NO)
+        if (obsoleteRoomHiddenFromUserFormerValue != obsoleteRoomSummary.hiddenFromUser)
         {
-            obsoleteRoomSummary.hiddenFromUser = YES;
             [obsoleteRoomSummary save:YES];
         }
-    }
-}
-
-- (void)checkRoomIsVirtualWithCreateEvent:(MXEvent*)createEvent summary:(MXRoomSummary*)summary session:(MXSession *)session
-{
-    // If room is already hidden, do not check if we should hide it
-    if (summary.hiddenFromUser)
-    {
-        return;
-    }
-    
-    MXRoomCreateContent *createContent = [MXRoomCreateContent modelFromJSON:createEvent.content];
-    
-    if (createContent.virtualRoomInfo.isVirtual && [summary.creatorUserId isEqualToString:createEvent.sender])
-    {
-        summary.hiddenFromUser = YES;
     }
 }
 
@@ -403,16 +252,11 @@
 
 - (BOOL)updateSummaryDisplayname:(MXRoomSummary *)summary session:(MXSession *)session withServerRoomSummary:(MXRoomSyncSummary *)serverRoomSummary roomState:(MXRoomState *)roomState
 {
-    return [self updateSummaryDisplayname:summary session:session withServerRoomSummary:serverRoomSummary roomState:roomState excludingUserIDs:@[]];
-}
+    NSString *displayname;
 
-- (BOOL)updateSummaryDisplayname:(MXRoomSummary *)summary session:(MXSession *)session withServerRoomSummary:(MXRoomSyncSummary *)serverRoomSummary roomState:(MXRoomState *)roomState excludingUserIDs:(NSArray<NSString *> *)excludedUserIDs
-{
-    NSString *displayName;
-
-    if (!_roomNameStringLocalizer)
+    if (!_roomNameStringLocalizations)
     {
-        _roomNameStringLocalizer = [MXRoomNameDefaultStringLocalizer new];
+        _roomNameStringLocalizations = [MXRoomNameDefaultStringLocalizations new];
     }
 
     // Compute a display name according to algorithm provided by Matrix room summaries
@@ -421,113 +265,99 @@
     // If m.room.name is set, use that
     if (roomState.name.length)
     {
-        displayName = roomState.name;
+        displayname = roomState.name;
     }
     // If m.room.canonical_alias is set, use that
     // Note: a "" for canonicalAlias means the previous one has been removed
     else if (roomState.canonicalAlias.length)
     {
-        displayName = roomState.canonicalAlias;
+        displayname = roomState.canonicalAlias;
     }
     // If the room has an alias, use that
     else if (roomState.aliases.count)
     {
-        displayName = roomState.aliases.firstObject;
+        displayname = roomState.aliases.firstObject;
     }
     else
     {
         NSUInteger memberCount = 0;
-        NSMutableArray<NSString*> *memberIdentifiers = [NSMutableArray array];
+        NSMutableArray<NSString*> *memberNames;
 
         // Use Matrix room summaries and heroes
         if (serverRoomSummary)
         {
+            memberCount = serverRoomSummary.joinedMemberCount + serverRoomSummary.invitedMemberCount;
+
             if (serverRoomSummary.heroes.count)
             {
+                memberNames = [NSMutableArray arrayWithCapacity:serverRoomSummary.heroes.count];
                 for (NSString *hero in serverRoomSummary.heroes)
                 {
-                    if ([excludedUserIDs containsObject:hero])
+                    NSString *memberName = [roomState.members memberName:hero];
+                    if (!memberName)
                     {
-                        continue;
+                        memberName = hero;
                     }
-                    
-                    [memberIdentifiers addObject:hero];
+
+                    [memberNames addObject:memberName];
                 }
             }
-            
-            memberCount = serverRoomSummary.joinedMemberCount + serverRoomSummary.invitedMemberCount;
         }
         // Or in case of non lazy loading and no server room summary,
         // use the full room state
         else if (roomState.membersCount.members > 1)
         {
             NSArray *otherMembers = [self sortedOtherMembersInRoomState:roomState withMatrixSession:session];
+
+            memberNames = [NSMutableArray arrayWithCapacity:otherMembers.count];
             for (MXRoomMember *member in otherMembers)
             {
-                if ([excludedUserIDs containsObject:member.userId])
+                NSString *memberName = [roomState.members memberName:member.userId];
+                if (memberName)
                 {
-                    continue;
+                    [memberNames addObject:memberName];
                 }
-                
-                [memberIdentifiers addObject:member.userId];
             }
-            
-            memberCount = memberIdentifiers.count + 1;
+
+            memberCount = memberNames.count + 1;
         }
-        
+
         // We display 2 users names max. Then, for larger rooms, we display "Alice and X others"
-        switch (memberIdentifiers.count)
+        switch (memberNames.count)
         {
             case 0:
-            {
-                displayName = _roomNameStringLocalizer.emptyRoom;
+                displayname = _roomNameStringLocalizations.emptyRoom;
                 break;
-            }
+
             case 1:
-            {
-                MXRoomMember *member =  [roomState.members memberWithUserId:memberIdentifiers.firstObject];
-                NSString *memberName = [self memberNameFromRoomState:roomState withIdentifier:memberIdentifiers.firstObject];
-                
-                if (member.membership == MXMembershipLeave)
-                {
-                    displayName = [_roomNameStringLocalizer allOtherMembersLeft:memberName];
-                }
-                else
-                {
-                    displayName = memberName;
-                }
+                displayname = memberNames.firstObject;
                 break;
-            }
+
             case 2:
-            {
-                NSString *firstMemberName = [self memberNameFromRoomState:roomState withIdentifier:memberIdentifiers[0]];
-                NSString *secondMemberName = [self memberNameFromRoomState:roomState withIdentifier:memberIdentifiers[1]];
-                displayName = [_roomNameStringLocalizer twoMembers:firstMemberName second:secondMemberName];
+                displayname = [NSString stringWithFormat:_roomNameStringLocalizations.twoMembers,
+                                       memberNames[0],
+                                       memberNames[1]];
                 break;
-            }
+
             default:
-            {
-                if (memberCount > 2)
-                {
-                    NSString *memberName = [self memberNameFromRoomState:roomState withIdentifier:memberIdentifiers.firstObject];
-                    displayName = [_roomNameStringLocalizer moreThanTwoMembers:memberName count:@(memberCount - 2)];
-                }
+                displayname = [NSString stringWithFormat:_roomNameStringLocalizations.moreThanTwoMembers,
+                                       memberNames[0],
+                                       @(memberCount - 2)];
                 break;
-            }
         }
 
         if (memberCount > 1
-            && (!displayName || [displayName isEqualToString:_roomNameStringLocalizer.emptyRoom]))
+            && (!displayname || [displayname isEqualToString:_roomNameStringLocalizations.emptyRoom]))
         {
             // Data are missing to compute the display name
-            MXLogDebug(@"[MXRoomSummaryUpdater] updateSummaryDisplayname: Warning: Computed an unexpected \"Empty Room\" name. memberCount: %@", @(memberCount));
-            displayName = [self fixUnexpectedEmptyRoomDisplayname:memberCount session:session roomState:roomState];
+            NSLog(@"[MXRoomSummaryUpdater] updateSummaryDisplayname: Warning: Computed an unexpected \"Empty Room\" name. memberCount: %@", @(memberCount));
+            displayname = [self fixUnexpectedEmptyRoomDisplayname:memberCount session:session roomState:roomState];
         }
     }
 
-    if (displayName != summary.displayname || ![displayName isEqualToString:summary.displayname])
+    if (displayname != summary.displayname || ![displayname isEqualToString:summary.displayname])
     {
-        summary.displayname = displayName;
+        summary.displayname = displayname;
         return YES;
     }
 
@@ -560,44 +390,52 @@
         }
     }
 
-    MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Found %@ loaded members for %@ known other members", @(otherMembers.count), @(memberCount - 1));
+    NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Found %@ loaded members for %@ known other members", @(otherMembers.count), @(memberCount - 1));
 
     switch (memberNames.count)
     {
         case 0:
-            MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: No luck");
-            displayname = _roomNameStringLocalizer.emptyRoom;
+            NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: No luck");
+            displayname = _roomNameStringLocalizations.emptyRoom;
             break;
 
         case 1:
             if (memberCount == 2)
             {
-                MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Fixed 1");
+                NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Fixed 1");
                 displayname = memberNames[0];
             }
             else
             {
-                MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Half fixed 1");
-                displayname = [_roomNameStringLocalizer moreThanTwoMembers:memberNames[0] count:@(memberCount - 1)];
+                NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Half fixed 1");
+                displayname = [NSString stringWithFormat:_roomNameStringLocalizations.moreThanTwoMembers,
+                               memberNames[0],
+                               @(memberCount - 1)];
             }
             break;
 
         case 2:
             if (memberCount == 3)
             {
-                MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Fixed 2");
-                displayname = [_roomNameStringLocalizer twoMembers:memberNames[0] second:memberNames[1]];
+                NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Fixed 2");
+                displayname = [NSString stringWithFormat:_roomNameStringLocalizations.twoMembers,
+                               memberNames[0],
+                               memberNames[1]];
             }
             else
             {
-                MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Half fixed 2");
-                displayname = [_roomNameStringLocalizer moreThanTwoMembers:memberNames[0] count:@(memberCount - 2)];
+                NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Half fixed 2");
+                displayname = [NSString stringWithFormat:_roomNameStringLocalizations.moreThanTwoMembers,
+                               memberNames[0],
+                               @(memberCount - 2)];
             }
             break;
 
         default:
-            MXLogDebug(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Fixed 3");
-            displayname = [_roomNameStringLocalizer moreThanTwoMembers:memberNames[0] count:@(memberCount - 2)];
+            NSLog(@"[MXRoomSummaryUpdater] fixUnexpectedEmptyRoomDisplayname: Fixed 3");
+            displayname = [NSString stringWithFormat:_roomNameStringLocalizations.moreThanTwoMembers,
+                           memberNames[0],
+                           @(memberCount - 2)];
             break;
     }
 
@@ -606,41 +444,27 @@
 
 - (BOOL)updateSummaryAvatar:(MXRoomSummary *)summary session:(MXSession *)session withServerRoomSummary:(MXRoomSyncSummary *)serverRoomSummary roomState:(MXRoomState *)roomState
 {
-    return [self updateSummaryAvatar:summary session:session withServerRoomSummary:serverRoomSummary roomState:roomState excludingUserIDs:@[]];
-}
-
-- (BOOL)updateSummaryAvatar:(MXRoomSummary *)summary session:(MXSession *)session withServerRoomSummary:(MXRoomSyncSummary *)serverRoomSummary roomState:(MXRoomState *)roomState excludingUserIDs:(NSArray<NSString *> *)excludedUserIDs
-{
     NSString *avatar;
-    
+
     // If m.room.avatar is set, use that
     if (roomState.avatar)
     {
         avatar = roomState.avatar;
     }
-    // Else, for direct messages only, try using the other member's avatar
-    else if (summary.isDirect)
+    // Else, use Matrix room summaries and heroes
+    else if (serverRoomSummary.heroes.count == 1)
     {
-        // Use Matrix room summaries and heroes
-        NSArray<NSString *> *filteredHeroes = [self filteredHeroesFromServerRoomSummary:serverRoomSummary excludingUserIDs:excludedUserIDs];
-        if (filteredHeroes.count == 1)
-        {
-            MXRoomMember *otherMember = [roomState.members memberWithUserId:filteredHeroes.firstObject];
-            avatar = otherMember.avatarUrl;
-        }
-        // Or in case of non lazy loading or no server room summary,
-        // use the full room state
-        else
-        {
-            NSArray<MXRoomMember*> *otherMembers = [self sortedOtherMembersInRoomState:roomState withMatrixSession:session];
-            NSArray<MXRoomMember *> *filteredMembers = [self filteredMembersFromMembers:otherMembers excludingUserIDs:excludedUserIDs];
-            if (filteredMembers.count == 1)
-            {
-                avatar = filteredMembers.firstObject.avatarUrl;
-            }
-        }
+        MXRoomMember *otherMember = [roomState.members memberWithUserId:serverRoomSummary.heroes.firstObject];
+        avatar = otherMember.avatarUrl;
     }
-    
+    // Or in case of non lazy loading or no server room summary,
+    // use the full room state
+    else if (roomState.membersCount.members == 2)
+    {
+        NSArray<MXRoomMember*> *otherMembers = [self sortedOtherMembersInRoomState:roomState withMatrixSession:session];
+        avatar = otherMembers.firstObject.avatarUrl;
+    }
+
     if (avatar != summary.avatar || ![avatar isEqualToString:summary.avatar])
     {
         summary.avatar = avatar;
@@ -648,45 +472,6 @@
     }
 
     return NO;
-}
-
-/**
- Returns the heroes from the serverRoomSummary, excluding any of the specified user IDs.
- */
-- (NSArray<NSString *> *)filteredHeroesFromServerRoomSummary:(MXRoomSyncSummary *)serverRoomSummary excludingUserIDs:(NSArray<NSString *> *)excludedUserIDs
-{
-    if (serverRoomSummary == nil)
-    {
-        return @[];
-    }
-    
-    NSMutableArray<NSString*> *filteredHeroes = [NSMutableArray arrayWithCapacity:serverRoomSummary.heroes.count];
-    for (NSString *hero in serverRoomSummary.heroes)
-    {
-        if (![excludedUserIDs containsObject:hero])
-        {
-            [filteredHeroes addObject:hero];
-        }
-    }
-    
-    return filteredHeroes;
-}
-
-/**
- Returns the members array, excluding any members who match one of the specified user IDs.
- */
-- (NSArray<MXRoomMember *> *)filteredMembersFromMembers:(NSArray<MXRoomMember *> *)members excludingUserIDs:(NSArray<NSString *> *)excludedUserIDs
-{
-    NSMutableArray<MXRoomMember*> *filteredMembers = [NSMutableArray arrayWithCapacity:members.count];
-    for (MXRoomMember *member in members)
-    {
-        if (![excludedUserIDs containsObject:member.userId])
-        {
-            [filteredMembers addObject:member];
-        }
-    }
-    
-    return filteredMembers;
 }
 
 - (BOOL)updateSummaryMemberCount:(MXRoomSummary *)summary session:(MXSession *)session withServerRoomSummary:(MXRoomSyncSummary *)serverRoomSummary roomState:(MXRoomState *)roomState
@@ -752,120 +537,6 @@
     }];
 
     return otherMembers;
-}
-
-- (BOOL)shouldHideRoomWithRoomTypeString:(NSString*)roomTypeString
-{
-    BOOL hiddenFromUser = NO;
-    
-    if (!roomTypeString.length)
-    {
-        hiddenFromUser = !self.showNilOrEmptyRoomType;
-    }
-    else if (self.showRoomTypeStrings.count)
-    {
-        hiddenFromUser = NO == [self.showRoomTypeStrings containsObject:roomTypeString];
-    }
-    else
-    {
-        hiddenFromUser = YES;
-    }
-    
-    return hiddenFromUser;
-}
-
-- (NSString *)memberNameFromRoomState:(MXRoomState *)roomState withIdentifier:(NSString *)identifier
-{
-    NSString *name = [roomState.members memberName:identifier];
-    return (name.length > 0 ? name : identifier);
-}
-
-- (BOOL)isEventTypeAllowedAsLastMessage:(NSString*)eventTypeString
-{
-    if (!self.lastMessageEventTypesAllowList)
-    {
-        return YES;
-    }
-    
-    return [self.lastMessageEventTypesAllowList containsObject:eventTypeString];    
-}
-
-- (BOOL)isEventUserProfileChange:(MXEvent*)event
-{
-    if (event.eventType != MXEventTypeRoomMember)
-    {
-        return NO;
-    }
-        
-    return event.isUserProfileChange;
-}
-
-- (BOOL)isMembershipEventJoinOrInvite:(MXEvent*)event forUserId:(NSString*)userId
-{
-    if (event.eventType != MXEventTypeRoomMember)
-    {
-        return NO;
-    }
-    
-    NSString *eventUserId = event.stateKey;
-        
-    if (![userId isEqualToString:eventUserId])
-    {
-        return NO;
-    }
-    
-    MXRoomMember *roomMember = [[MXRoomMember alloc] initWithMXEvent:event];
-    
-    return roomMember.membership == MXMembershipInvite || roomMember.membership == MXMembershipJoin;    
-}
-
-- (BOOL)isMembershipEventAllowedAsLastMessage:(MXEvent*)event forUserId:(NSString*)userId
-{
-    // Do not handle user profile change
-    if ([self isEventUserProfileChange:event])
-    {
-        return NO;
-    }
-    
-    // Only accept membership join or invite for given user id
-    return [self isMembershipEventJoinOrInvite:event forUserId:userId]; 
-}
-
-#pragma mark Beacon info
-
-- (BOOL)updateUserIdsSharingLiveBeacon:(NSMutableSet<NSString*>*)userIdsSharingLiveBeacon withStateEvent:(MXEvent*)stateEvent
-{
-    MXBeaconInfo *beaconInfo = [[MXBeaconInfo alloc] initWithMXEvent:stateEvent];
-    
-    NSString *userId = beaconInfo.userId;
-    
-    if (!beaconInfo || !userId)
-    {
-        return NO;
-    }
-        
-    BOOL updated = NO;
-    
-    BOOL isUserExist = [userIdsSharingLiveBeacon containsObject:userId];
-    
-    if (beaconInfo.isLive)
-    {
-        if (!isUserExist)
-        {
-            [userIdsSharingLiveBeacon addObject:userId];
-            updated = YES;
-        }
-    }
-    else
-    {
-        if (isUserExist)
-        {
-            [userIdsSharingLiveBeacon removeObject:userId];
-            updated = YES;
-        }
-    }
-    
-    return updated;
 }
 
 @end

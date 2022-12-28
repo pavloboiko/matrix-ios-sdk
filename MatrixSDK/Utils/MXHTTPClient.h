@@ -50,22 +50,23 @@ FOUNDATION_EXPORT NSString* const kMXHTTPClientMatrixErrorNotificationErrorKey;
 typedef BOOL (^MXHTTPClientOnUnrecognizedCertificate)(NSData *certificate);
 
 /**
- Block called when an authenticated request fails and is used  to validate the response error.
-
+ Block called when a request fails and needs authorization to determine if the access token should be renewed.
+ 
  @param error A request error.
  
- @return YES if the access token should be refreshed for the given error.
+ @return YES if the access token should be renewed for the given error.
  */
-typedef BOOL (^MXHTTPClientTokenValidationResponseHandler)(NSError *error);
+typedef BOOL (^MXHTTPClientShouldRenewTokenHandler)(NSError *error);
 
 /**
- Block called when an authenticated request requires an access token.
+ Block called when a request needs authorization and access token should be renewed.
 
- @param error  A request error. Passed if token provider is called as a result of `MXHTTPClientTokenValidationResponseHandler` returning true on after an access token error in a response.
  @param success A block object called when the operation succeeds. It provides the access token.
  @param failure A block object called when the operation fails.
+ 
+ @return a MXHTTPOperation instance.
  */
-typedef void (^MXHTTPClientTokenProviderHandler)(NSError *error, void (^success)( NSString *accessToken), void (^failure)(NSError *error));
+typedef MXHTTPOperation* (^MXHTTPClientRenewTokenHandler)(void (^success)(NSString *accessToken), void (^failure)(NSError *error));
 
 /**
  SSL Pinning mode
@@ -122,40 +123,35 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
 @property (nonatomic, readonly) NSString *accessToken;
 
 /**
- Block called when a request needs authentication and access token should be renewed.
+ Block called when a request needs authorization and access token should be renewed.
  */
-@property (nonatomic, copy) MXHTTPClientTokenValidationResponseHandler tokenValidationResponseHandler;
+@property (nonatomic, copy) MXHTTPClientShouldRenewTokenHandler shouldRenewTokenHandler;
 
 /**
- Block called when an authenticated request requires an access token.
+ Block called when a request fails and needs authorization to determine if the access token should be renewed.
  */
-@property (nonatomic, copy) MXHTTPClientTokenProviderHandler tokenProviderHandler;
-
-/**
- Whether or not the client is able to send authenticated requests.
- */
-@property (nonatomic, readonly) BOOL isAuthenticatedClient;
+@property (nonatomic, copy) MXHTTPClientRenewTokenHandler renewTokenHandler;
 
 #pragma mark - Public methods
 /**
  Create an instance to make requests to the server.
 
  @param baseURL the server URL from which requests will be done.
- @param onUnrecognizedCertBlock the block called to handle unrecognised certificate (nil if unrecognised certificates are ignored).
+ @param onUnrecognizedCertBlock the block called to handle unrecognized certificate (nil if unrecognized certificates are ignored).
  @return a MXHTTPClient instance.
  */
 - (id)initWithBaseURL:(NSString*)baseURL andOnUnrecognizedCertificateBlock:(MXHTTPClientOnUnrecognizedCertificate)onUnrecognizedCertBlock;
 
 /**
- Create an instance to make requests to the server.
+ Create an intance to make access-token-authenticated requests to the server.
  MXHTTPClient will automatically add the access token to requested URLs
 
  @param baseURL the server URL from which requests will be done.
- @param authenticated whether the client is required make authenticated requests.
- @param onUnrecognizedCertBlock the block called to handle unrecognised certificate (nil if unrecognised certificates are ignored).
+ @param accessToken the access token to authenticate requests.
+ @param onUnrecognizedCertBlock the block called to handle unrecognized certificate (nil if unrecognized certificates are ignored).
  @return a MXHTTPClient instance.
  */
-- (id)initWithBaseURL:(NSString*)baseURL authenticated:(BOOL)authenticated andOnUnrecognizedCertificateBlock:(MXHTTPClientOnUnrecognizedCertificate)onUnrecognizedCertBlock;
+- (id)initWithBaseURL:(NSString*)baseURL accessToken:(NSString*)accessToken andOnUnrecognizedCertificateBlock:(MXHTTPClientOnUnrecognizedCertificate)onUnrecognizedCertBlock;
 
 /**
  Make a HTTP request to the server.
@@ -228,7 +224,7 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
  @param httpMethod the HTTP method (GET, PUT, ...)
  @param path the relative path of the server API to call.
  @param parameters the parameters to be set as a query string for `GET` requests, or the request HTTP body.
- @param needsAuthentication Indicate YES if the request is authenticated.
+ @param needsAuthorization Indicate YES if the request is authenticated.
  
  @param success A block object called when the operation succeeds. It provides the JSON response object from the the server.
  @param failure A block object called when the operation fails.
@@ -238,7 +234,7 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
 - (MXHTTPOperation*)requestWithMethod:(NSString *)httpMethod
                                  path:(NSString *)path
                            parameters:(NSDictionary*)parameters
-                  needsAuthentication:(BOOL)needsAuthentication
+                   needsAuthorization:(BOOL)needsAuthorization
                               success:(void (^)(NSDictionary *JSONResponse))success
                               failure:(void (^)(NSError *error))failure;
 
@@ -248,7 +244,7 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
  @param httpMethod the HTTP method (GET, PUT, ...)
  @param path the relative path of the server API to call.
  @param parameters the parameters to be set as a query string for `GET` requests, or the request HTTP body.
- @param needsAuthentication Indicate YES if the request is authenticated.
+ @param needsAuthorization Indicate YES if the request is authenticated.
  @param timeoutInSeconds the timeout allocated for the request.
  
  @param success A block object called when the operation succeeds. It provides the JSON response object from the the server.
@@ -259,7 +255,7 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
 - (MXHTTPOperation*)requestWithMethod:(NSString *)httpMethod
                                  path:(NSString *)path
                            parameters:(NSDictionary*)parameters
-                   needsAuthentication:(BOOL)needsAuthentication
+                   needsAuthorization:(BOOL)needsAuthorization
                               timeout:(NSTimeInterval)timeoutInSeconds
                               success:(void (^)(NSDictionary *JSONResponse))success
                               failure:(void (^)(NSError *error))failure;
@@ -269,7 +265,7 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
  
  @param path the relative path of the server API to call.
  @param parameters (optional) the parameters to be set as a query string for `GET` requests, or the request HTTP body.
- @param needsAuthentication Indicate YES if the request is authenticated.
+ @param needsAuthorization Indicate YES if the request is authenticated.
  @param data (optional) the data to post.
  @param headers (optional) the HTTP headers to set.
  @param timeoutInSeconds (optional) the timeout allocated for the request.
@@ -284,13 +280,26 @@ typedef NS_ENUM(NSUInteger, MXHTTPClientSSLPinningMode) {
 - (MXHTTPOperation*)requestWithMethod:(NSString *)httpMethod
                                  path:(NSString *)path
                            parameters:(NSDictionary*)parameters
-                  needsAuthentication:(BOOL)needsAuthentication
+                   needsAuthorization:(BOOL)needsAuthorization
                                  data:(NSData *)data
                               headers:(NSDictionary*)headers
                               timeout:(NSTimeInterval)timeoutInSeconds
                        uploadProgress:(void (^)(NSProgress *uploadProgress))uploadProgress
                               success:(void (^)(NSDictionary *JSONResponse))success
                               failure:(void (^)(NSError *error))failure;
+
+/**
+ Get current access or get a new one if not exist.
+ Note: There is no guarantee that current access token is valid.
+
+ @param success A block object called when the operation succeeds. It provides the access token.
+ @param failure A block object called when the operation fails.
+ 
+ @return a MXHTTPOperation instance. Nil if the access token is already known
+ and no HTTP request is required.
+ */
+- (MXHTTPOperation *)getAccessTokenAndRenewIfNeededWithSuccess:(void (^)(NSString *accessToken))success
+                                                       failure:(void (^)(NSError *error))failure;
 
 /**
  Return the amount of time to wait before retrying a request.

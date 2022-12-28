@@ -26,7 +26,7 @@
 
 @implementation MXKeyVerificationByDMRequest
 
-- (instancetype)initWithEvent:(MXEvent*)event andManager:(MXLegacyKeyVerificationManager*)manager
+- (instancetype)initWithEvent:(MXEvent*)event andManager:(MXKeyVerificationManager*)manager
 {
     // Check verification by DM request format
     MXKeyVerificationRequestByDMJSONModel *request;
@@ -41,6 +41,7 @@
     if (self)
     {
         _request = request;
+        _roomId = event.roomId;
         _eventId = event.eventId;
         
         MXCredentials *myCreds = manager.crypto.mxSession.matrixRestClient.credentials;

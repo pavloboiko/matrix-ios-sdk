@@ -80,7 +80,7 @@ static NSUInteger const kDefaultIterations = 500000;
                                    derivedKey.mutableBytes,
                                    derivedKey.length);
 
-    MXLogDebug(@"[MXKeyBackupPassword] deriveKey: %tu iterations took %.0fms", iterations, [[NSDate date] timeIntervalSinceDate:startDate] * 1000);
+    NSLog(@"[MXKeyBackupPassword] deriveKey: %tu iterations took %.0fms", iterations, [[NSDate date] timeIntervalSinceDate:startDate] * 1000);
 
     if (result != kCCSuccess)
     {

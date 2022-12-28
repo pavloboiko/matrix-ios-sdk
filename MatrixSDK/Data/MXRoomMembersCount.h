@@ -16,8 +16,6 @@
 
 #import <Foundation/Foundation.h>
 
-@class MXRoomMembersCountMO;
-
 /**
  Room members counts.
  */
@@ -26,20 +24,5 @@
 @property (nonatomic) NSUInteger members;
 @property (nonatomic) NSUInteger joined;
 @property (nonatomic) NSUInteger invited;
-
-#pragma mark - CoreData Model
-
-- (instancetype) initWithManagedObject:(MXRoomMembersCountMO *)model;
-
-/**
- Initializer with numbers.
- 
- @param members number of members
- @param joined number of joined members
- @param invited number of invited members
- */
-- (instancetype)initWithMembers:(NSUInteger)members
-                         joined:(NSUInteger)joined
-                        invited:(NSUInteger)invited;
 
 @end

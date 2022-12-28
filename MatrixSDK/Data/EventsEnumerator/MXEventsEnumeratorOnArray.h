@@ -19,30 +19,16 @@
 #import "MXEventsEnumerator.h"
 
 /**
- Data source which provides the most up-to-date event to an enumerator
- based on the event identifier.
- */
-@protocol MXEventsEnumeratorDataSource
-- (MXEvent *)eventWithEventId:(NSString *)eventId;
-@end
-
-/**
- Generic events enumerator on an array of event identifiers that are
- translated to events on demand.
+ Generic events enumerator on an array of events.
  */
 @interface MXEventsEnumeratorOnArray : NSObject <MXEventsEnumerator>
 
 /**
- Construct an enumerator based on an array of event identifiers.
-
- @param eventIds the list of event identifiers to enumerate.
-                 The order is chronological where the first item is the oldest event
- @param dataSource object responsible for translating an event identifier into
-                   the most recent version of the event.
+ Construct an enumerator based on a events array.
  
+ @param messages the list of messages to enumerate.
  @return the newly created instance.
  */
-- (instancetype)initWithEventIds:(NSArray<NSString *> *)eventIds
-                      dataSource:(id<MXEventsEnumeratorDataSource>)dataSource;
+- (instancetype)initWithMessages:(NSArray<MXEvent*> *)messages;
 
 @end

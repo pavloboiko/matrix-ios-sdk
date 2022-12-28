@@ -2,7 +2,6 @@
  Copyright 2014 OpenMarket Ltd
  Copyright 2017 Vector Creations Ltd
  Copyright 2018 New Vector Ltd
- Copyright 2020 The Matrix.org Foundation C.I.C
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -19,8 +18,6 @@
 
 #import "MXMemoryStore.h"
 
-#import "MXFileRoomStore.h"
-
 NS_ASSUME_NONNULL_BEGIN
 
 /**
@@ -28,17 +25,14 @@ NS_ASSUME_NONNULL_BEGIN
  */
 typedef NS_OPTIONS(NSInteger, MXFileStorePreloadOptions)
 {
+    // Preload rooms summaries
+    MXFileStorePreloadOptionRoomSummary = 0x1,
+
     // Preload rooms states
-    MXFileStorePreloadOptionRoomState = 1 << 0,
+    MXFileStorePreloadOptionRoomState = 0x2,
 
     // Preload rooms account data
-    MXFileStorePreloadOptionRoomAccountData = 1 << 1,
-    
-    // Preload rooms messages
-    MXFileStorePreloadOptionRoomMessages = 1 << 2,
-
-    // Preload read receipts
-    MXFileStorePreloadOptionReadReceipts = 1 << 3
+    MXFileStorePreloadOptionRoomAccountData = 0x4
 };
 
 /**
@@ -54,14 +48,12 @@ typedef NS_OPTIONS(NSInteger, MXFileStorePreloadOptions)
             + rooms
                 + {roomId1}
                     L messages: The room messages
-                    L outgoingMessages: The room outgoing messages
                     L state: The room state events
                     L summary: The room summary
                     L accountData: The account data for this room
                     L receipts: The read receipts for this room
                 + {roomId2}
                     L messages
-                    L outgoingMessages
                     L state
                     L summary
                     L accountData
@@ -152,6 +144,15 @@ typedef NS_OPTIONS(NSInteger, MXFileStorePreloadOptions)
            failure:(nullable void (^)(NSError *error))failure;
 
 /**
+ Get the list of all stored rooms summaries.
+ 
+ @param success A block object called when the operation succeeds.
+ @param failure A block object called when the operation fails.
+ */
+- (void)asyncRoomsSummaries:(void (^)(NSArray<MXRoomSummary *> *roomsSummaries))success
+                    failure:(nullable void (^)(NSError *error))failure;
+
+/**
  Get the stored account data for a specific room.
  
  @param roomId the Id of the room
@@ -163,27 +164,6 @@ typedef NS_OPTIONS(NSInteger, MXFileStorePreloadOptions)
                        failure:(nullable void (^)(NSError * _Nonnull error))failure;
 
 
-#pragma mark - Sync API (Do not use them on the main thread)
-
-/**
- Calls `loadMetaData:` with `enableClearData` as YES.
- */
-- (void)loadMetaData;
-
-/**
- Load metadata for the store. Sets eventStreamToken.
-
- @param enableClearData flag to enable clearing data in case of eventStreamToken is missing.
- */
-- (void)loadMetaData:(BOOL)enableClearData;
-
-/**
- Get the room store for a given room.
- 
- @param roomId the room id.
- @return the store.
- */
-- (nullable MXFileRoomStore *)roomStoreForRoom:(NSString*)roomId;
 
 @end
 

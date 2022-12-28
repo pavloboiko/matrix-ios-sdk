@@ -25,13 +25,7 @@
 
 #import "MXEvent.h"
 #import "MXJSONModels.h"
-#import "MXSDKOptions.h"
 #import "MXEnumConstants.h"
-#import "MXCallHangupEventContent.h"
-#import "MXCallSessionDescription.h"
-#import "MXCallRejectReplacementEventContent.h"
-
-MX_ASSUME_MISSING_NULLABILITY_BEGIN
 
 @interface MXTools : NSObject
 
@@ -43,15 +37,6 @@ MX_ASSUME_MISSING_NULLABILITY_BEGIN
 
 + (MXPresence)presence:(MXPresenceString)presenceString;
 + (MXPresenceString)presenceString:(MXPresence)presence;
-
-+ (MXCallHangupReason)callHangupReason:(MXCallHangupReasonString)reasonString;
-+ (MXCallHangupReasonString)callHangupReasonString:(MXCallHangupReason)reason;
-
-+ (MXCallSessionDescriptionType)callSessionDescriptionType:(MXCallSessionDescriptionTypeString)typeString;
-+ (MXCallSessionDescriptionTypeString)callSessionDescriptionTypeString:(MXCallSessionDescriptionType)type;
-
-+ (MXCallRejectReplacementReason)callRejectReplacementReason:(MXCallRejectReplacementReasonString)reasonString;
-+ (MXCallRejectReplacementReasonString)callRejectReplacementReasonString:(MXCallRejectReplacementReason)reason;
 
 /**
  Generate a random secret key.
@@ -65,7 +50,7 @@ MX_ASSUME_MISSING_NULLABILITY_BEGIN
 
  @return the transaction id.
  */
-+ (NSString* _Nonnull)generateTransactionId;
++ (NSString*)generateTransactionId;
 
 /**
  Removing new line characters from NSString.
@@ -161,47 +146,39 @@ FOUNDATION_EXPORT NSString *const kMXToolsRegexStringForMatrixGroupIdentifier;
  */
 + (NSString*)encodeURIComponent:(NSString*)string;
 
+
 #pragma mark - Permalink
 /*
- Return a permalink to a room.
- The permalink could be matrix.to format or a custom client permalink (see `MXSDKOptions.clientPermalinkBaseUrl`).
+ Return a matrix.to permalink to a room.
 
  @param roomIdOrAlias the id or the alias of the room to link to.
- @return the permalink.
+ @return the matrix.to permalink.
  */
 + (NSString*)permalinkToRoom:(NSString*)roomIdOrAlias;
 
 /*
- Return a permalink to an event.
- The permalink could be matrix.to format or a custom client permalink (see `MXSDKOptions.clientPermalinkBaseUrl`).
- 
+ Return a matrix.to permalink to an event.
+
  @param eventId the id of the event to link to.
  @param roomIdOrAlias the room the event belongs to.
- @return the permalink.
+ @return the matrix.to permalink.
  */
 + (NSString*)permalinkToEvent:(NSString*)eventId inRoom:(NSString*)roomIdOrAlias;
 
 /*
- Return a permalink to a user.
- The permalink could be matrix.to format or a custom client permalink (see `MXSDKOptions.clientPermalinkBaseUrl`).
+ Return a matrix.to permalink to a user.
  
  @param userId the id of the user to link to.
- @return the permalink.
+ @return the matrix.to permalink.
  */
 + (NSString*)permalinkToUserWithUserId:(NSString*)userId;
+
 #pragma mark - File
 
 /**
  Round file size.
  */
 + (long long)roundFileSize:(long long)filesize;
-
-/**
- Return file size in string format using `NSByteCountFormatter`.
- 
- @param fileSize the file size in bytes.
- */
-+ (NSString*)fileSizeToString:(long)fileSize;
 
 /**
  Return file size in string format.
@@ -246,32 +223,13 @@ FOUNDATION_EXPORT NSString *const kMXToolsRegexStringForMatrixGroupIdentifier;
  If the device does not support MP4 file format, the function will use the QuickTime format.
  
  @param videoLocalURL the local path of the video to convert.
- @param targetFileSize a file size limit to aim for.
  @param success A block object called when the operation succeeded. It returns
  the path of the output video with some metadata.
  @param failure A block object called when the operation failed.
  */
 + (void)convertVideoToMP4:(NSURL*)videoLocalURL
-       withTargetFileSize:(NSInteger)targetFileSize
                   success:(void(^)(NSURL *videoLocalURL, NSString *mimetype, CGSize size, double durationInMs))success
-                  failure:(void(^)(NSError *error))failure;
-
-/**
- Convert from a video to a MP4 video container.
- 
- @discussion
- If the device does not support MP4 file format, the function will use the QuickTime format.
- 
- @param videoAsset an AVAsset for the video to convert.
- @param targetFileSize a file size limit to aim for.
- @param success A block object called when the operation succeeded. It returns
- the path of the output video with some metadata.
- @param failure A block object called when the operation failed.
- */
-+ (void)convertVideoAssetToMP4:(AVAsset*)videoAsset
-            withTargetFileSize:(NSInteger)targetFileSize
-                       success:(void(^)(NSURL *videoLocalURL, NSString *mimetype, CGSize size, double durationInMs))success
-                       failure:(void(^)(NSError *error))failure;
+                  failure:(void(^)(void))failure;
 
 #pragma mark - JSON Serialisation
 
@@ -311,7 +269,7 @@ FOUNDATION_EXPORT NSString *const kMXToolsRegexStringForMatrixGroupIdentifier;
 #define MXStrongifyAndReturnIfNil(var) \
     if (!weak##var) \
     { \
-        MXLogWarning(@"[MXStrongifyAndReturnIfNil] Released reference at %@:%d", @(__FILE__).lastPathComponent, __LINE__); \
+        NSLog(@"[MXStrongifyAndReturnIfNil] Released reference at %@:%d", @(__FILE__).lastPathComponent, __LINE__); \
         return; \
     } \
     typeof(var) var = weak##var
@@ -327,23 +285,10 @@ FOUNDATION_EXPORT NSString *const kMXToolsRegexStringForMatrixGroupIdentifier;
 #define MXStrongifyAndReturnValueIfNil(var, value) \
     if (!weak##var) \
     { \
-        MXLogWarning(@"[MXStrongifyAndReturnIfNil] Released reference at %@:%d", @(__FILE__).lastPathComponent, __LINE__); \
+        NSLog(@"[MXStrongifyAndReturnIfNil] Released reference at %@:%d", @(__FILE__).lastPathComponent, __LINE__); \
         return value; \
     } \
     typeof(var) var = weak##var
-
-
-#pragma mark - OS
-
-/**
- Return the available memory.
- 
- @discussion
- Available only for iOS from iOS13.
- 
- @return free memory in bytes.
- */
-+ (NSUInteger)memoryAvailable;
 
 
 #pragma mark - Unit testing
@@ -356,5 +301,3 @@ FOUNDATION_EXPORT NSString *const kMXToolsRegexStringForMatrixGroupIdentifier;
 + (BOOL)isRunningUnitTests;
 
 @end
-
-MX_ASSUME_MISSING_NULLABILITY_END

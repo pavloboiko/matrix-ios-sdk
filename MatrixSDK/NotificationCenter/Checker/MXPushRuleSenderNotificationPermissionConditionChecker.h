@@ -30,6 +30,6 @@
  @param mxSession the mxSession to the home server.
  @return the newly created MXPushRuleSenderNotificationPermissionConditionChecker instance.
  */
-- (instancetype _Nonnull)initWithMatrixSession:(MXSession* _Nullable)mxSession;
+- (instancetype)initWithMatrixSession:(MXSession*)mxSession;
 
 @end

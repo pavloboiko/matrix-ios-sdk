@@ -34,10 +34,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - Data
 
-// The base64 string can be padded or unpadded
-+ (NSData *)dataFromBase64:(NSString *)base64;
++ (NSData *)dataFromUnpaddedBase64:(NSString *)unpaddedBase64;
 
 + (NSString *)base64FromData:(NSData *)data;
+
 + (NSString *)unpaddedBase64FromData:(NSData *)data;
 
 @end

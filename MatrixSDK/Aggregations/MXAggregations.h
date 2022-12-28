@@ -26,14 +26,11 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class MXBeaconAggregations;
-
 /**
  The `MXAggregations` class instance manages the Matrix aggregations API.
  */
 @interface MXAggregations : NSObject
 
-@property (nonatomic, strong, readonly) MXBeaconAggregations *beaconAggregations;
 
 #pragma mark - Reactions
 
@@ -49,7 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
  @param failure A block object called when the operation fails.
  */
 - (void)addReaction:(NSString*)reaction
-           forEvent:(NSString*)eventId
+        forEvent:(NSString*)eventId
              inRoom:(NSString*)roomId
             success:(void (^)(void))success
             failure:(void (^)(NSError *error))failure;
@@ -114,7 +111,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (MXHTTPOperation*)reactionsEventsForEvent:(NSString*)eventId
                                      inRoom:(NSString*)roomId
                                        from:(nullable NSString*)from
-                                      limit:(NSInteger)limit
+                                      limit:(NSUInteger)limit
                                     success:(void (^)(MXAggregationPaginatedResponse *paginatedResponse))success
                                     failure:(void (^)(NSError *error))failure;
 
@@ -171,7 +168,7 @@ NS_ASSUME_NONNULL_BEGIN
                               isEncrypted:(BOOL)isEncrypted
                                    inRoom:(NSString*)roomId
                                      from:(nullable NSString*)from
-                                    limit:(NSInteger)limit
+                                    limit:(NSUInteger)limit
                                   success:(void (^)(MXAggregationPaginatedResponse *paginatedResponse))success
                                   failure:(void (^)(NSError *error))failure;
 
@@ -194,7 +191,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (MXHTTPOperation*)referenceEventsForEvent:(NSString*)eventId
                                    inRoom:(NSString*)roomId
                                      from:(nullable NSString*)from
-                                    limit:(NSInteger)limit
+                                    limit:(NSUInteger)limit
                                   success:(void (^)(MXAggregationPaginatedResponse *paginatedResponse))success
                                   failure:(void (^)(NSError *error))failure;
 

@@ -28,7 +28,7 @@
 #import "MXSASTransaction.h"
 
 @interface MXKeyVerificationStatusResolver ()
-@property (nonatomic, weak) MXLegacyKeyVerificationManager *manager;
+@property (nonatomic, weak) MXKeyVerificationManager *manager;
 @property (nonatomic) MXSession *mxSession;
 @end
 
@@ -37,7 +37,7 @@
 
 #pragma mark - Setup
 
-- (instancetype)initWithManager:(MXLegacyKeyVerificationManager*)manager matrixSession:(MXSession*)matrixSession;
+- (instancetype)initWithManager:(MXKeyVerificationManager*)manager matrixSession:(MXSession*)matrixSession;
 
 {
     self = [super init];
@@ -98,7 +98,7 @@
     return operation;
 }
 
-- (nullable MXKeyVerification*)keyVerificationFromRequest:(nullable id<MXKeyVerificationRequest>)request andTransaction:(nullable id<MXKeyVerificationTransaction>)transaction
+- (nullable MXKeyVerification*)keyVerificationFromRequest:(nullable MXKeyVerificationRequest*)request andTransaction:(nullable MXKeyVerificationTransaction*)transaction
 {
     if (!request && !transaction)
     {
@@ -140,7 +140,7 @@
 {
     MXKeyVerification *keyVerification;
 
-    id<MXKeyVerificationRequest> request = [self verificationRequestInDMEvent:originalEvent events:events];
+    MXKeyVerificationRequest *request = [self verificationRequestInDMEvent:originalEvent events:events];
 
     if (request)
     {
@@ -156,7 +156,7 @@
 - (nullable MXKeyVerificationByDMRequest*)verificationRequestInDMEvent:(MXEvent*)event events:(NSArray<MXEvent*> *)events
 {
     MXKeyVerificationByDMRequest *request;
-    if (![event.content[kMXMessageTypeKey] isEqualToString:kMXMessageTypeKeyVerificationRequest])
+    if (![event.content[@"msgtype"] isEqualToString:kMXMessageTypeKeyVerificationRequest])
     {
         return nil;
     }
@@ -334,15 +334,15 @@
     return state;
 }
 
-- (MXKeyVerificationState)stateFromRequest:(nullable id<MXKeyVerificationRequest>)request andTransaction:(nullable id<MXKeyVerificationTransaction>)transaction
+- (MXKeyVerificationState)stateFromRequest:(nullable MXKeyVerificationRequest*)request andTransaction:(nullable MXKeyVerificationTransaction*)transaction
 {
     MXKeyVerificationState keyVerificationState = MXKeyVerificationStateRequestPending;
     
     if (transaction)
     {
-        if ([transaction isKindOfClass:MXLegacyQRCodeTransaction.class])
+        if ([transaction isKindOfClass:MXQRCodeTransaction.class])
         {
-            MXLegacyQRCodeTransaction *qrCodeTransaction = (MXLegacyQRCodeTransaction*)transaction;
+            MXQRCodeTransaction *qrCodeTransaction = (MXQRCodeTransaction*)transaction;
             
             switch (qrCodeTransaction.state) {
                 case MXQRCodeTransactionStateUnknown:
@@ -377,9 +377,9 @@
                     break;
             }
         }
-        else if ([transaction conformsToProtocol:@protocol(MXSASTransaction)])
+        else if ([transaction isKindOfClass:MXSASTransaction.class])
         {
-            id<MXSASTransaction> sasTransaction = (id<MXSASTransaction>)transaction;
+            MXSASTransaction *sasTransaction = (MXSASTransaction*)transaction;
             
             switch (sasTransaction.state) {
                 case MXSASTransactionStateVerified:

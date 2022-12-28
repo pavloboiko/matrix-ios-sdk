@@ -26,6 +26,8 @@
 @interface MXNotificationCenterTests : XCTestCase
 {
     MatrixSDKTestsData *matrixSDKTestsData;
+
+    MXSession *mxSession;
 }
 
 @end
@@ -41,6 +43,12 @@
 
 - (void)tearDown
 {
+    if (mxSession)
+    {
+        [mxSession close];
+        mxSession = nil;
+    }
+
     matrixSDKTestsData = nil;
     
     [super tearDown];
@@ -50,8 +58,7 @@
 {
     [matrixSDKTestsData doMXRestClientTestWithBob:self readyToTest:^(MXRestClient *bobRestClient, XCTestExpectation *expectation) {
 
-        MXSession *mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
-        [matrixSDKTestsData retain:mxSession];
+        mxSession = [[MXSession alloc] initWithMatrixRestClient:bobRestClient];
 
         XCTAssertNotNil(mxSession.notificationCenter);
         XCTAssertNil(mxSession.notificationCenter.rules);
@@ -76,7 +83,9 @@
 
 - (void)testNoNotificationsOnUserEvents
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession, MXRoom *room, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndARoomWithMessages:self readyToTest:^(MXSession *mxSession2, MXRoom *room, XCTestExpectation *expectation) {
+
+        mxSession = mxSession2;
 
         [mxSession.notificationCenter listenToNotifications:^(MXEvent *event, MXRoomState *roomState, MXPushRule *rule) {
 
@@ -85,7 +94,7 @@
 
         }];
 
-        [room sendTextMessage:@"This message should not generate a notification" threadId:nil success:^(NSString *eventId) {
+        [room sendTextMessage:@"This message should not generate a notification" success:^(NSString *eventId) {
 
             // Wait to check that no notification happens
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
@@ -104,6 +113,8 @@
 - (void)testNoNotificationsOnPresenceOrTypingEvents
 {
     [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+
+        mxSession = bobSession;
 
         [bobSession.notificationCenter listenToNotifications:^(MXEvent *event, MXRoomState *roomState, MXPushRule *rule) {
 
@@ -141,14 +152,16 @@
 // While this ticket is not fixed, make sure the SDK workrounds it
 - (void)testDefaultPushOnAllNonYouMessagesRule
 {
-    [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *mxSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+    [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+
+        mxSession = bobSession;
 
         MXRoom *room = [mxSession roomWithRoomId:roomId];
-        [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+        [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
             [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMember] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
-                [mxSession.notificationCenter listenToNotifications:^(MXEvent *event, MXRoomState *roomState, MXPushRule *rule) {
+                [bobSession.notificationCenter listenToNotifications:^(MXEvent *event, MXRoomState *roomState, MXPushRule *rule) {
 
                     // We must be alerted by the default content HS rule on any message
                     XCTAssertEqual(rule.kind, MXPushRuleKindUnderride);
@@ -157,7 +170,7 @@
                     [expectation fulfill];
                 }];
 
-                [aliceRestClient sendTextMessageToRoom:roomId threadId:nil text:@"a message" success:^(NSString *eventId) {
+                [aliceRestClient sendTextMessageToRoom:roomId text:@"a message" success:^(NSString *eventId) {
 
                 } failure:^(NSError *error) {
                     XCTFail(@"Cannot set up intial test conditions - error: %@", error);
@@ -200,7 +213,7 @@
 //                XCTAssert([rule.pattern hasPrefix:@"mxbob"], @"As content rule, the pattern must be define. Rule: %@", rule);
 //
 //                // Check the right event has been notified
-//                XCTAssertEqualObjects(event.content[kMXMessageBodyKey], messageFromAlice, @"The wrong messsage has been caught. event: %@", event);
+//                XCTAssertEqualObjects(event.content[@"body"], messageFromAlice, @"The wrong messsage has been caught. event: %@", event);
 //
 //                [expectation fulfill];
 //            }];
@@ -230,9 +243,9 @@
 {
     [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
 
+        mxSession = bobSession;
+
         MXSession *aliceSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:aliceSession];
-        
         [aliceSession start:^{
 
             // Change alice name
@@ -254,8 +267,8 @@
 
                 }];
 
-                MXRoom *roomBobSide = [bobSession roomWithRoomId:roomId];
-                [roomBobSide sendTextMessage:messageFromBob threadId:nil success:^(NSString *eventId) {
+                MXRoom *roomBobSide = [mxSession roomWithRoomId:roomId];
+                [roomBobSide sendTextMessage:messageFromBob success:^(NSString *eventId) {
 
                 } failure:^(NSError *error) {
                     XCTFail(@"Cannot set up intial test conditions - error: %@", error);
@@ -275,9 +288,11 @@
     }];
 }
 
-- (void)testDefaultEventMatchCondition
+- (void)testDefaultRoomMemberCountCondition
 {
     [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
+
+        mxSession = bobSession;
 
         NSString *messageFromAlice = @"We are two peoples in this room";
 
@@ -288,16 +303,16 @@
             XCTAssert(rule.isDefault, @"The rule must be the server default rule. Rule: %@", rule);
 
             MXPushRuleCondition *condition = rule.conditions[0];
-            XCTAssertEqualObjects(condition.kind, kMXPushRuleConditionStringEventMatch, @"The default content rule with room_member_count condition must fire first");
-            XCTAssertEqual(condition.kindType, MXPushRuleConditionTypeEventMatch);
+            XCTAssertEqualObjects(condition.kind, kMXPushRuleConditionStringRoomMemberCount, @"The default content rule with room_member_count condition must fire first");
+            XCTAssertEqual(condition.kindType, MXPushRuleConditionTypeRoomMemberCount);
 
             // Check the right event has been notified
-            XCTAssertEqualObjects(event.content[kMXMessageBodyKey], messageFromAlice, @"The wrong messsage has been caught. event: %@", event);
+            XCTAssertEqualObjects(event.content[@"body"], messageFromAlice, @"The wrong messsage has been caught. event: %@", event);
 
             [expectation fulfill];
         }];
 
-        [aliceRestClient sendTextMessageToRoom:roomId threadId:nil text:messageFromAlice success:^(NSString *eventId) {
+        [aliceRestClient sendTextMessageToRoom:roomId text:messageFromAlice success:^(NSString *eventId) {
 
         } failure:^(NSError *error) {
             XCTFail(@"Cannot set up intial test conditions - error: %@", error);
@@ -311,6 +326,8 @@
 {
     [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
 
+        mxSession = bobSession;
+
         NSString *messageFromAlice = @"We are two peoples in this room";
 
         id listener = [bobSession.notificationCenter listenToNotifications:^(MXEvent *event, MXRoomState *roomState, MXPushRule *rule) {
@@ -323,7 +340,7 @@
         [bobSession.notificationCenter removeListener:listener];
 
 
-        [aliceRestClient sendTextMessageToRoom:roomId threadId:nil text:messageFromAlice success:^(NSString *eventId) {
+        [aliceRestClient sendTextMessageToRoom:roomId text:messageFromAlice success:^(NSString *eventId) {
 
             // Wait to check that no notification happens
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
@@ -342,9 +359,9 @@
 {
     [matrixSDKTestsData doMXSessionTestWithBobAndAliceInARoom:self readyToTest:^(MXSession *bobSession, MXRestClient *aliceRestClient, NSString *roomId, XCTestExpectation *expectation) {
 
+        mxSession = bobSession;
+
         MXSession *aliceSession = [[MXSession alloc] initWithMatrixRestClient:aliceRestClient];
-        [matrixSDKTestsData retain:aliceSession];
-        
         [aliceSession start:^{
 
             // Change alice name
@@ -376,8 +393,8 @@
                     }
                 }];
 
-                MXRoom *roomBobSide = [bobSession roomWithRoomId:roomId];
-                [roomBobSide sendTextMessage:messageFromBob threadId:nil success:^(NSString *eventId) {
+                MXRoom *roomBobSide = [mxSession roomWithRoomId:roomId];
+                [roomBobSide sendTextMessage:messageFromBob success:^(NSString *eventId) {
 
                 } failure:^(NSError *error) {
                     XCTFail(@"Cannot set up intial test conditions - error: %@", error);

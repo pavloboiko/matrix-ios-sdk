@@ -66,22 +66,33 @@
     MXRoom *room = [self.mxSession roomWithRoomId:roomId];
     if (!room)
     {
-        MXLogDebug(@"[MXAggregations] replaceTextMessageEvent: Error: Unknown room: %@", roomId);
+        NSLog(@"[MXAggregations] replaceTextMessageEvent: Error: Unknown room: %@", roomId);
         failure(nil);
         return nil;
     }
+
+    // If it is not already done, decrypt the event to build the new content
+    if (event.isEncrypted && !event.clearEvent)
+    {
+        if (![self.mxSession decryptEvent:event inTimeline:nil])
+        {
+            NSLog(@"[MXAggregations] replaceTextMessageEvent: Fail to decrypt original event: %@", event.eventId);
+            failure(nil);
+            return nil;
+        }
+    }
     
-    NSString *messageType = event.content[kMXMessageTypeKey];
+    NSString *messageType = event.content[@"msgtype"];
     
     if (![self.editSupportedMessageTypes containsObject:messageType])
     {
-        MXLogDebug(@"[MXAggregations] replaceTextMessageEvent: Error: Only message types %@ are supported", self.editSupportedMessageTypes);
+        NSLog(@"[MXAggregations] replaceTextMessageEvent: Error: Only message types %@ are supported", self.editSupportedMessageTypes);
         failure(nil);
         return nil;
     }
     
-    NSString *compatibilityText;
-    NSString *compatibilityFormattedText;
+    NSString *finalText;
+    NSString *finalFormattedText;
     
     if (event.isReplyEvent)
     {
@@ -90,74 +101,67 @@
         
         if (replyEventParts)
         {
-            compatibilityText = [NSString stringWithFormat:@"%@ * %@", replyEventParts.bodyParts.replyTextPrefix, text];
+            finalText = [NSString stringWithFormat:@"%@%@", replyEventParts.bodyParts.replyTextPrefix, text];
             NSString *formattedReplyText = formattedText ?: text;
-            if (replyEventParts.formattedBodyParts.replyTextPrefix)
-            {
-                compatibilityFormattedText = [NSString stringWithFormat:@"%@ * %@", replyEventParts.formattedBodyParts.replyTextPrefix, formattedReplyText];
-            }
+            finalFormattedText = [NSString stringWithFormat:@"%@%@", replyEventParts.formattedBodyParts.replyTextPrefix, formattedReplyText];
         }
         else
         {
-            MXLogDebug(@"[MXAggregations] replaceTextMessageEvent: Fail to parse reply event: %@", event.eventId);
-
-            // This enables editing replies that don't provide a fallback mx-reply body.
-            compatibilityText = [NSString stringWithFormat:@"* %@", text];
-            if (formattedText.length > 0)
-            {
-                compatibilityFormattedText = [NSString stringWithFormat:@"* %@", formattedText];
-            }
+            NSLog(@"[MXAggregations] replaceTextMessageEvent: Fail to parse reply event: %@", event.eventId);
+            failure(nil);
+            return nil;
         }
     }
     else
     {
-        compatibilityText = [NSString stringWithFormat:@"* %@", text];
-        if (formattedText.length > 0)
-        {
-            compatibilityFormattedText = [NSString stringWithFormat:@"* %@", formattedText];
-        }
+        finalText = text;
+        finalFormattedText = formattedText;
     }
     
     NSMutableDictionary *content = [NSMutableDictionary new];
-    NSMutableDictionary *compatibilityContent = [NSMutableDictionary dictionaryWithDictionary:@{ kMXMessageTypeKey: messageType,
-                                                                                                 kMXMessageBodyKey: compatibilityText
-                                                                                              }];
-    if (compatibilityFormattedText)
+    NSMutableDictionary *compatibilityContent = [NSMutableDictionary dictionaryWithDictionary:@{
+                                                                                                @"msgtype": messageType,
+                                                                                                @"body": [NSString stringWithFormat:@"* %@", finalText]
+                                                                                                }];
+    
+    NSMutableDictionary *newContent = [NSMutableDictionary dictionaryWithDictionary:@{
+                                                                                      @"msgtype": messageType,
+                                                                                      @"body": finalText
+                                                                                      }];
+    
+    
+    if (finalFormattedText)
     {
         // Send the HTML formatted string
+        
         [compatibilityContent addEntriesFromDictionary:@{
-            @"formatted_body": compatibilityFormattedText,
-            @"format": kMXRoomMessageFormatHTML
-        }];
-
-    }
-
-    NSMutableDictionary *newContent = [NSMutableDictionary dictionaryWithDictionary:@{ kMXMessageTypeKey: messageType,
-                                                                                       kMXMessageBodyKey: text }];
-    if (formattedText.length > 0)
-    {
+                                                         @"formatted_body": [NSString stringWithFormat:@"* %@", finalFormattedText],
+                                                         @"format": kMXRoomMessageFormatHTML
+                                                         }];
+        
+        
         [newContent addEntriesFromDictionary:@{
-            @"formatted_body": formattedText,
-            @"format": kMXRoomMessageFormatHTML
-        }];
+                                               @"formatted_body": finalFormattedText,
+                                               @"format": kMXRoomMessageFormatHTML
+                                               }];
     }
     
     
     [content addEntriesFromDictionary:compatibilityContent];
     
-    content[kMXMessageContentKeyNewContent] = newContent;
+    content[@"m.new_content"] = newContent;
     
-    content[kMXEventRelationRelatesToKey] = @{
-        kMXEventContentRelatesToKeyRelationType : MXEventRelationTypeReplace,
-        kMXEventContentRelatesToKeyEventId: event.eventId
-    };
+    content[@"m.relates_to"] = @{
+                                 @"rel_type" : @"m.replace",
+                                 @"event_id": event.eventId
+                                 };
     
     MXHTTPOperation *operation;
     MXEvent *localEcho;
     if (event.isLocalEvent)
     {
         // Need to wait to get the final event id of the message being sent
-        MXLogDebug(@"[MXAggregations] replaceTextMessageEvent: Event to edit is a local echo. Wait for the end of the sending");
+        NSLog(@"[MXAggregations] replaceTextMessageEvent: Event to edit is a local echo. Wait for the end of the sending");
         operation = [MXHTTPOperation new];
 
         MXWeakify(self);
@@ -167,7 +171,7 @@
 
             if (event.sentState == MXEventSentStateSent)
             {
-                MXLogDebug(@"[MXAggregations] replaceTextMessageEvent: Edit request can be done now");
+                NSLog(@"[MXAggregations] replaceTextMessageEvent: Edit request can be done now");
 
                 [[NSNotificationCenter defaultCenter] removeObserver:observer];
                 observer = nil;
@@ -181,13 +185,13 @@
         if (localEchoBlock)
         {
             // Build a temporary local echo
-            localEcho = [room fakeEventWithEventId:nil eventType:kMXEventTypeStringRoomMessage andContent:content threadId:nil];
+            localEcho = [room fakeEventWithEventId:nil eventType:kMXEventTypeStringRoomMessage andContent:content];
             localEcho.sentState = event.sentState;
         }
     }
     else
     {
-        operation = [room sendEventOfType:kMXEventTypeStringRoomMessage content:content threadId:nil localEcho:&localEcho success:success failure:failure];
+        operation = [room sendEventOfType:kMXEventTypeStringRoomMessage content:content localEcho:&localEcho success:success failure:failure];
     }
 
     if (localEchoBlock && localEcho)
@@ -226,12 +230,6 @@
 
     if (event)
     {
-        if (![event.sender isEqualToString:replaceEvent.sender])
-        {
-            //  not coming from the original sender, ignore
-            MXLogDebug(@"[MXAggregations] handleReplace: Edit event not coming from the original sender, ignoring.");
-            return;
-        }
         if (![event.unsignedData.relations.replace.eventId isEqualToString:replaceEvent.eventId])
         {
             MXEvent *editedEvent = [event editedEventFromReplacementEvent:replaceEvent];
@@ -239,13 +237,20 @@
             if (editedEvent)
             {
                 [self.matrixStore replaceEvent:editedEvent inRoom:roomId];
+
+                if (editedEvent.isEncrypted && !editedEvent.clearEvent)
+                {
+                    [self.mxSession decryptEvent:editedEvent inTimeline:nil];
+                }
+
+
                 [self notifyEventEditsListenersOfRoom:roomId replaceEvent:replaceEvent];
             }
         }
     }
     else
     {
-        MXLogDebug(@"[MXAggregations] handleReplace: Unknown event id: %@", replaceEvent.relatesTo.eventId);
+        NSLog(@"[MXAggregations] handleReplace: Unknown event id: %@", replaceEvent.relatesTo.eventId);
     }
 }
 

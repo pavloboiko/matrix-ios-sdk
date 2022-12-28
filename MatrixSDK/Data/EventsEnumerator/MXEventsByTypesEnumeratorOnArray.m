@@ -34,27 +34,25 @@
 
 @implementation MXEventsByTypesEnumeratorOnArray
 
-- (instancetype)initWithEventIds:(NSArray<NSString *> *)eventIds
-                      andTypesIn:(NSArray*)theTypes
-                      dataSource:(id<MXEventsEnumeratorDataSource>)dataSource
+- (instancetype)initWithMessages:(NSArray<MXEvent *> *)messages andTypesIn:(NSArray *)theTypes
 {
     self = [super init];
     if (self)
     {
         types = theTypes;
-        allMessagesEnumerator = [[MXEventsEnumeratorOnArray alloc] initWithEventIds:eventIds dataSource:dataSource];
+        allMessagesEnumerator = [[MXEventsEnumeratorOnArray alloc] initWithMessages:messages];
     }
 
     return self;
 }
 
-- (NSArray<MXEvent *> *)nextEventsBatch:(NSUInteger)eventsCount threadId:(NSString *)threadId
+- (NSArray<MXEvent *> *)nextEventsBatch:(NSUInteger)eventsCount
 {
     NSMutableArray *nextEvents;
     MXEvent *event;
 
     // Feed the array with matching events
-    while ((nextEvents.count != eventsCount) && (event = self.nextEvent))
+    while ((event = self.nextEvent) && (nextEvents.count != eventsCount))
     {
         if (!nextEvents)
         {

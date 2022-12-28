@@ -18,7 +18,6 @@
 
 #ifdef MX_CRYPTO
 
-#import <OLMKit/OLMKit.h>
 #import "MXCryptoConstants.h"
 
 @implementation MXOlmInboundGroupSession
@@ -57,12 +56,10 @@
         sessionData.sessionId = _session.sessionIdentifier;
         sessionData.sessionKey = sessionKey;
         sessionData.algorithm = kMXCryptoMegolmAlgorithm;
-        sessionData.sharedHistory = _sharedHistory;
-        sessionData.untrusted = _untrusted;
     }
     else
     {
-        MXLogDebug(@"[MXOlmInboundGroupSession] exportSessionData: Cannot export session with id %@-%@. Error: %@", _session.sessionIdentifier, _senderKey, error);
+        NSLog(@"[MXOlmInboundGroupSession] exportSessionData: Cannot export session with id %@-%@. Error: %@", _session.sessionIdentifier, _senderKey, error);
     }
 
     return sessionData;
@@ -82,7 +79,7 @@
         _session  = [[OLMInboundGroupSession alloc] initInboundGroupSessionWithImportedSession:sessionKey error:&error];
         if (!_session)
         {
-            MXLogDebug(@"[MXOlmInboundGroupSession] initWithImportedSessionKey failed. Error: %@", error);
+            NSLog(@"[MXOlmInboundGroupSession] initWithImportedSessionKey failed. Error: %@", error);
             return nil;
         }
     }
@@ -99,8 +96,6 @@
         _forwardingCurve25519KeyChain = data.forwardingCurve25519KeyChain;
         _keysClaimed = data.senderClaimedKeys;
         _roomId = data.roomId;
-        _sharedHistory = data.sharedHistory;
-        _untrusted = data.isUntrusted;
     }
     return self;
 }
@@ -117,9 +112,6 @@
         _senderKey = [aDecoder decodeObjectForKey:@"senderKey"];
         _forwardingCurve25519KeyChain = [aDecoder decodeObjectForKey:@"forwardingCurve25519KeyChain"];
         _keysClaimed = [aDecoder decodeObjectForKey:@"keysClaimed"];
-        _sharedHistory = [[aDecoder decodeObjectForKey:@"sharedHistory_v2"] boolValue];
-        //  if "untrusted" is not encoded, mark it as untrusted
-        _untrusted = [aDecoder containsValueForKey:@"untrusted"] ? [aDecoder decodeBoolForKey:@"untrusted"] : YES;
     }
     return self;
 }
@@ -131,8 +123,6 @@
     [aCoder encodeObject:_senderKey forKey:@"senderKey"];
     [aCoder encodeObject:_keysClaimed forKey:@"keysClaimed"];
     [aCoder encodeObject:_forwardingCurve25519KeyChain forKey:@"forwardingCurve25519KeyChain"];
-    [aCoder encodeObject:@(_sharedHistory) forKey:@"sharedHistory_v2"];
-    [aCoder encodeBool:_untrusted forKey:@"untrusted"];
 }
 
 @end

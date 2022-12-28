@@ -19,7 +19,7 @@
 #import "MXCrossSigningInfo.h"
 #import "MXCrossSigningKey.h"
 
-@class MXLegacyCrypto;
+@class MXCrypto;
 
 
 NS_ASSUME_NONNULL_BEGIN
@@ -32,18 +32,12 @@ NS_ASSUME_NONNULL_BEGIN
  It is sent only if our session can cross-sign the new devices.
  Give an associated userInfo dictionary of type NSDictionary<NSString*, NSArray<NSString*>*> with following key: "deviceIds". Use constants below for convenience.
  */
-FOUNDATION_EXPORT NSString *const MXCrossSigningMyUserDidSignInOnNewDeviceNotification;
-
-/**
- Notification name sent when cross-signing keys has changed.
- It is sent when cross-signing has been reset from another device.
- */
-FOUNDATION_EXPORT NSString *const MXCrossSigningDidChangeCrossSigningKeysNotification;
+extern NSString *const MXCrossSigningMyUserDidSignInOnNewDeviceNotification;
 
 /**
  userInfo dictionary keys used by `MXCrossSigningDidDetectNewSignInNotification`.
  */
-FOUNDATION_EXPORT NSString *const MXCrossSigningNotificationDeviceIdsKey;
+extern NSString *const MXCrossSigningNotificationDeviceIdsKey;
 
 /**
  Cross-signing state of the current acount.
@@ -76,6 +70,14 @@ typedef NS_ENUM(NSInteger, MXCrossSigningState)
      It can cross-sign other users or other devices of this account.
      */
     MXCrossSigningStateCanCrossSign,
+    
+    /**
+     Same as MXCrossSigningStateCanCrossSign but private keys can only be used asynchronously.
+     Access to these keys may require UI interaction with the user like passphrase, Face ID, etc.
+     */
+    // TODO: This is unused for the moment but it will come back with the full implemenation of SSSS.
+    // All related code has been removed to remove noise. Check the code in this commit.
+    MXCrossSigningStateCanCrossSignAsynchronously,
 };
 
 
@@ -86,16 +88,20 @@ typedef NS_ENUM(NSInteger, MXCrossSigningErrorCode)
     MXCrossSigningUnknownDeviceIdErrorCode,
 };
 
-@protocol MXCrossSigning <NSObject>
+
+@interface MXCrossSigning : NSObject
+
+/**
+ The Matrix crypto.
+ */
+@property (nonatomic, readonly, weak) MXCrypto *crypto;
 
 /**
  Cross-signing state for this account and this device.
  */
 @property (nonatomic, readonly) MXCrossSigningState state;
-@property (nonatomic, nullable, readonly) MXCrossSigningInfo *myUserCrossSigningKeys;
 @property (nonatomic, readonly) BOOL canTrustCrossSigning;
 @property (nonatomic, readonly) BOOL canCrossSign;
-@property (nonatomic, readonly) BOOL hasAllPrivateKeys;
 
 /**
  Check update for this device cross-signing state (self.state).
@@ -107,34 +113,29 @@ typedef NS_ENUM(NSInteger, MXCrossSigningErrorCode)
                         failure:(nullable void (^)(NSError *error))failure;
 
 /**
- Bootstrap cross-signing with user's password.
+ Bootstrap cross-signing on this device.
 
- @param password the account password to upload cross-signing keys to the HS.
+ This creates cross-signing keys. It will use keysStorageDelegate to store
+ private parts.
+
+ TODO: Support other authentication flows than password.
+ TODO: This method will probably change or disappear. It is here mostly for development
+ while SSSS is not available.
+
+ @param password the account password to upload keys to the HS.
 
  @param success A block object called when the operation succeeds.
  @param failure A block object called when the operation fails.
  */
-- (void)setupWithPassword:(NSString*)password
-                  success:(void (^)(void))success
-                  failure:(void (^)(NSError *error))failure;
-
-/**
- Bootstrap cross-signing using authentication parameters.
- 
- @param authParams the auth parameters to upload cross-signing keys to the HS.
- 
- @param success A block object called when the operation succeeds.
- @param failure A block object called when the operation fails.
- */
-- (void)setupWithAuthParams:(NSDictionary*)authParams
-                    success:(void (^)(void))success
-                    failure:(void (^)(NSError *error))failure;
-
+- (void)bootstrapWithPassword:(NSString*)password
+                      success:(void (^)(void))success
+                      failure:(void (^)(NSError *error))failure;
 
 /**
  Cross-sign another device of our user.
- 
- The operation requires to have the Self Signing Key in the local secret storage.
+
+ This method will use keysStorageDelegate get the private part of the Self Signing
+ Key (MXCrossSigningKeyType.selfSigning).
 
  @param deviceId the id of the device to cross-sign.
 
@@ -148,8 +149,9 @@ typedef NS_ENUM(NSInteger, MXCrossSigningErrorCode)
 /**
  Trust a user from one of their devices.
 
- The operation requires to have the User Signing Key in the local secret storage.
- 
+ This method will use keysStorageDelegate get the private part of the User Signing
+ Key (MXCrossSigningKeyType.userSigning).
+
  @param userId the id of ther user.
 
  @param success A block object called when the operation succeeds.
@@ -159,22 +161,6 @@ typedef NS_ENUM(NSInteger, MXCrossSigningErrorCode)
                    success:(void (^)(void))success
                    failure:(void (^)(NSError *error))failure;
 
-/**
- Get the stored cross-siging information of a user.
-
- @param userId The user.
- @return the cross-signing information if any.
- */
-- (nullable MXCrossSigningInfo *)crossSigningKeysForUser:(NSString*)userId;
-
-@end
-
-@interface MXLegacyCrossSigning : NSObject <MXCrossSigning>
-
-/**
- The Matrix crypto.
- */
-@property (nonatomic, readonly, weak) MXLegacyCrypto *crypto;
 
 /**
  Request private keys for cross-signing from other devices.

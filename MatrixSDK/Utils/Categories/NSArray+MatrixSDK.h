@@ -28,14 +28,6 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSArray<ObjectType> *)mx_intersectArray:(NSArray<ObjectType> *)array;
 
-/**
- Create a new array with the union with another array.
-
- @param array the other array
- @return a new array with items union of the items from both original arrays.
- */
-- (NSArray<ObjectType> *)mx_unionArray:(NSArray<ObjectType> *)array;
-
 @end
 
 NS_ASSUME_NONNULL_END

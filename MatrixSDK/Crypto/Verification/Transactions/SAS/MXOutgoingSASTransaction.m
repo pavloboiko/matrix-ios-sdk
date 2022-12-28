@@ -31,11 +31,11 @@
 
 - (void)start;
 {
-    MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] start");
+    NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] start");
 
     if (self.state != MXSASTransactionStateUnknown)
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] start: wrong state: %@", self);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] start: wrong state: %@", self);
         self.state = MXSASTransactionStateCancelled;
         return;
     }
@@ -60,16 +60,16 @@
         self.state = MXSASTransactionStateOutgoingWaitForPartnerToAccept;
 
         [self sendToOther:kMXEventTypeStringKeyVerificationStart content:startContent.JSONDictionary success:^{
-            MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] start: sendToOther:kMXEventTypeStringKeyVerificationStart succeeds");
+            NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] start: sendToOther:kMXEventTypeStringKeyVerificationStart succeeds");
         } failure:^(NSError * _Nonnull error) {
-            MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] start: sendToOther:kMXEventTypeStringKeyVerificationStart failed. Error: %@", error);
+            NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] start: sendToOther:kMXEventTypeStringKeyVerificationStart failed. Error: %@", error);
             self.error = error;
             self.state = MXSASTransactionStateError;
         }];
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] start: Invalid startContent: %@", startContent);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] start: Invalid startContent: %@", startContent);
         self.state = MXSASTransactionStateCancelled;
     }
 }
@@ -77,7 +77,7 @@
 
 #pragma mark - SDK-Private methods -
 
-- (instancetype)initWithOtherDevice:(MXDeviceInfo *)otherDevice andManager:(MXLegacyKeyVerificationManager *)manager
+- (instancetype)initWithOtherDevice:(MXDeviceInfo *)otherDevice andManager:(MXKeyVerificationManager *)manager
 {
     self = [super initWithOtherDevice:otherDevice andManager:manager];
     if (self)
@@ -95,11 +95,11 @@
 - (void)handleAccept:(MXKeyVerificationAccept*)acceptContent
 {
     // Alice's POV
-    MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept");
+    NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept");
 
     if (self.state != MXSASTransactionStateOutgoingWaitForPartnerToAccept)
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept: wrong state: %@. acceptContent: %@", self, acceptContent);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept: wrong state: %@. acceptContent: %@", self, acceptContent);
         [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
         return;
     }
@@ -110,7 +110,7 @@
         || ![kKnownMacs containsObject:acceptContent.messageAuthenticationCode]
         || ![acceptContent.shortAuthenticationString mx_intersectArray:kKnownShortCodes].count)
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept: wrong method: %@. acceptContent: %@", self, acceptContent);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept: wrong method: %@. acceptContent: %@", self, acceptContent);
         [self cancelWithCancelCode:MXTransactionCancelCode.unknownMethod];
         return;
     }
@@ -132,7 +132,7 @@
         self.state = MXSASTransactionStateWaitForPartnerKey;
 
     } failure:^(NSError * _Nonnull error) {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept: sendToOther:kMXEventTypeStringKeyVerificationKey failed. Error: %@", error);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleAccept: sendToOther:kMXEventTypeStringKeyVerificationKey failed. Error: %@", error);
         self.error = error;
         self.state = MXSASTransactionStateError;
     }];
@@ -140,18 +140,18 @@
 
 - (void)handleKey:(MXKeyVerificationKey *)keyContent
 {
-    MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey");
+    NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey");
 
     if (self.state != MXSASTransactionStateWaitForPartnerKey)
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: wrong state: %@. keyContent: %@", self, keyContent);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: wrong state: %@. keyContent: %@", self, keyContent);
         [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
         return;
     }
     
     if (!keyContent.isValid)
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: key content is invalid. keyContent: %@", keyContent);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: key content is invalid. keyContent: %@", keyContent);
         [self cancelWithCancelCode:MXTransactionCancelCode.unexpectedMessage];
         return;
     }
@@ -169,18 +169,16 @@
 
     if ([self.accepted.commitment isEqualToString:otherCommitment])
     {
-        self.sasBytes = [self generateSasBytesWithTheirPublicKey:keyContent.key
-                                                requestingDevice:self.manager.crypto.myDevice sasPublicKey:self.olmSAS.publicKey
-                                                     otherDevice:self.otherDevice otherSasPublicKey:keyContent.key];
+        self.sasBytes = [self generateSasBytesWithTheirPublicKey:keyContent.key requestingDevice:self.manager.crypto.myDevice otherDevice:self.otherDevice];
 
-//        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: ALICE CODE: %@", self.sasDecimal);
-//        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: ALICE EMOJI CODE: %@", self.sasEmoji);
+//        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: ALICE CODE: %@", self.sasDecimal);
+//        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: ALICE EMOJI CODE: %@", self.sasEmoji);
 
         self.state = MXSASTransactionStateShowSAS;
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: Bad commitment:\n%@\n%@", self.accepted.commitment, otherCommitment);
+        NSLog(@"[MXKeyVerification][MXOutgoingSASTransaction] handleKey: Bad commitment:\n%@\n%@", self.accepted.commitment, otherCommitment);
 
         [self cancelWithCancelCode:MXTransactionCancelCode.mismatchedCommitment];
     }

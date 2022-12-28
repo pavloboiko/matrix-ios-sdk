@@ -71,7 +71,7 @@
         || _shortAuthenticationString.count == 0
         || _commitment.length == 0)
    {
-        MXLogDebug(@"[MXKeyVerification] Invalid MXKeyVerificationAccept: %@", self);
+        NSLog(@"[MXKeyVerification] Invalid MXKeyVerificationAccept: %@", self);
         isValid = NO;
     }
 

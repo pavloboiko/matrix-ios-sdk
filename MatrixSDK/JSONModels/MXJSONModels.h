@@ -21,13 +21,10 @@
 #import "MXUsersDevicesMap.h"
 #import "MXKeyBackupVersion.h"
 #import "MXKeyBackupData.h"
+#import "MXMegolmBackupAuthData.h"
 #import "MXLoginTerms.h"
 #import "MXWellKnown.h"
 #import "MXCrossSigningInfo.h"
-#import "MXEnumConstants.h"
-#import "MXWarnings.h"
-
-MX_ASSUME_MISSING_NULLABILITY_BEGIN
 
 @class MXEvent, MXDeviceInfo, MXKey, MXUser;
 
@@ -97,11 +94,6 @@ FOUNDATION_EXPORT NSString *const kMX3PIDMediumMSISDN;
      */
     @property (nonatomic) NSString *avatarUrl;
 
-    /**
-     The type of the room. May be nil.
-     */
-    @property (nonatomic) NSString *roomTypeString;
-
     // The display name is computed from available information
     // @TODO: move it to MXSession as this class has additional information to compute the optimal display name
     - (NSString *)displayname;
@@ -130,6 +122,84 @@ FOUNDATION_EXPORT NSString *const kMX3PIDMediumMSISDN;
 @property (nonatomic) NSUInteger totalRoomCountEstimate;
 
 @end
+
+
+/**
+ This class describes a third party protocol instance.
+ */
+@interface MXThirdPartyProtocolInstance : MXJSONModel
+
+    /**
+     The network identifier.
+     */
+    @property (nonatomic) NSString *networkId;
+
+    /**
+     The fields (domain...).
+     */
+    @property (nonatomic) NSDictionary<NSString*, NSObject*> *fields;
+
+    /**
+     The instance id.
+     */
+    @property (nonatomic) NSString *instanceId;
+
+    /**
+     The description.
+     */
+    @property (nonatomic) NSString *desc;
+
+    /**
+     The dedicated bot.
+     */
+    @property (nonatomic) NSString *botUserId;
+
+    /**
+     The icon URL.
+     */
+    @property (nonatomic) NSString *icon;
+
+@end
+
+/**
+ This class describes a third party server protocol.
+ */
+@interface MXThirdPartyProtocol : MXJSONModel
+
+    /**
+     The user fields (domain, nick, username...).
+     */
+    @property (nonatomic) NSArray<NSString*> *userFields;
+
+    /**
+     The location fields (domain, channels, room...).
+     */
+    @property (nonatomic) NSArray<NSString*> *locationFields;
+
+    /**
+     The field types.
+     */
+    @property (nonatomic) NSDictionary<NSString*, NSDictionary<NSString*, NSString*>* > *fieldTypes;
+
+    /**
+     The instances.
+     */
+    @property (nonatomic) NSArray<MXThirdPartyProtocolInstance*> *instances;
+@end
+
+/**
+ `MXThirdpartyProtocolsResponse` represents the response of a thirdpartyProtocols request.
+ */
+@interface MXThirdpartyProtocolsResponse : MXJSONModel
+
+    /**
+     Available protocols. 
+     The key is the protocol name; the value, the protocol description.
+     */
+    @property (nonatomic) NSDictionary<NSString*, MXThirdPartyProtocol*> *protocols;
+
+@end
+
 
 /**
  Login flow types
@@ -172,18 +242,6 @@ FOUNDATION_EXPORT NSString *const kMXLoginIdentifierTypePhone;
      The list of stages to proceed the login or the registration.
      */
     @property (nonatomic) NSArray<MXLoginFlowType> *stages;
-
-@end
-
-/**
- `MXUsernameAvailability` represents the response returned when checking for username availability.
- */
-@interface MXUsernameAvailability : MXJSONModel
-
-    /**
-     A flag to indicate that the username is available. This should always be true when the server replies with 200 OK.
-     */
-    @property (nonatomic) BOOL available;
 
 @end
 
@@ -238,16 +296,6 @@ FOUNDATION_EXPORT NSString *const kMXLoginIdentifierTypePhone;
     @property (nonatomic) NSString *accessToken;
 
     /**
-     The lifetime in milliseconds of the access token. (optional)
-     */
-    @property (nonatomic) uint64_t expiresInMs;
-
-    /**
-     The refresh token, which can be used to obtain new access tokens. (optional)
-    */
-    @property (nonatomic) NSString *refreshToken;
-
-    /**
      The device id.
      */
     @property (nonatomic) NSString *deviceId;
@@ -258,6 +306,7 @@ FOUNDATION_EXPORT NSString *const kMXLoginIdentifierTypePhone;
     @property (nonatomic) MXWellKnown *wellknown;
 
 @end
+
 
 /**
  `MXThirdPartyIdentifier` represents the response to /account/3pid GET request.
@@ -286,6 +335,7 @@ FOUNDATION_EXPORT NSString *const kMXLoginIdentifierTypePhone;
 
 @end
 
+
 /**
  `MXCreateRoomResponse` represents the response to createRoom request.
  */
@@ -295,6 +345,11 @@ FOUNDATION_EXPORT NSString *const kMXLoginIdentifierTypePhone;
      The allocated room id.
      */
     @property (nonatomic) NSString *roomId;
+
+    /**
+     The alias on this home server.
+     */
+    @property (nonatomic) NSString *roomAlias;
 
 @end
 
@@ -350,11 +405,6 @@ FOUNDATION_EXPORT NSString *const kMXLoginIdentifierTypePhone;
      'thirdPartyInviteToken' is the token of this event. Else, nil.
      */
     @property (nonatomic) NSString *thirdPartyInviteToken;
-
-    /**
-     Flag to indicate whether it's a direct room. Only applicable if the membership is `invite`.
-     */
-    @property (nonatomic) BOOL isDirect;
 
 @end
 
@@ -413,13 +463,13 @@ FOUNDATION_EXPORT NSString *const kMXRoomTagServerNotice;
 /**
  Presence definitions
  */
-typedef NS_ENUM(NSUInteger, MXPresence)
+typedef enum : NSUInteger
 {
     MXPresenceUnknown,    // The home server did not provide the information
     MXPresenceOnline,
     MXPresenceUnavailable,
     MXPresenceOffline
-};
+} MXPresence;
 
 /**
  Presence definitions - String version
@@ -529,17 +579,6 @@ FOUNDATION_EXPORT NSString *const kMXPresenceOffline;
 /**
  The valid period in seconds of this token.
  */
-@property (nonatomic) uint64_t expiresIn;
-
-@end
-
-/**
- `MXLoginToken` represents the response of a /login/token creation request
- */
-@interface MXLoginToken : MXJSONModel
-
-@property (nonatomic) NSString *token;
-
 @property (nonatomic) uint64_t expiresIn;
 
 @end
@@ -693,7 +732,7 @@ typedef enum : NSUInteger
 
     // The condition is a custom condition. Refer to its `MXPushRuleConditionString` version
     MXPushRuleConditionTypeCustom = 1000
-} MXPushRuleConditionType NS_REFINED_FOR_SWIFT;
+} MXPushRuleConditionType;
 
 /**
  Push rule condition kind definitions - String version
@@ -1089,6 +1128,516 @@ FOUNDATION_EXPORT NSString *const kMXPushRuleScopeStringDevice;
 
 @end
 
+/**
+ `MXRoomSyncState` represents the state updates for a room during server sync.
+ */
+@interface MXRoomSyncState : MXJSONModel
+
+    /**
+     List of state events (array of MXEvent). The resulting state corresponds to the *start* of the timeline.
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+@end
+
+/**
+ `MXRoomSyncTimeline` represents the timeline of messages and state changes for a room during server sync.
+ */
+@interface MXRoomSyncTimeline : MXJSONModel
+
+    /**
+     List of events (array of MXEvent).
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+    /**
+     Boolean which tells whether there are more events on the server
+     */
+    @property (nonatomic) BOOL limited;
+
+    /**
+     If the batch was limited then this is a token that can be supplied to the server to retrieve more events
+     */
+    @property (nonatomic) NSString *prevBatch;
+
+@end
+
+/**
+ `MXRoomSyncEphemeral` represents the ephemeral events in the room that aren't recorded in the timeline or state of the room (e.g. typing).
+ */
+@interface MXRoomSyncEphemeral : MXJSONModel
+
+    /**
+     List of ephemeral events (array of MXEvent).
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+@end
+
+/**
+ `MXRoomSyncAccountData` represents the account data events for a room.
+ */
+@interface MXRoomSyncAccountData : MXJSONModel
+
+    /**
+     List of account data events (array of MXEvent).
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+@end
+
+/**
+ `MXRoomInviteState` represents the state of a room that the user has been invited to.
+ */
+@interface MXRoomInviteState : MXJSONModel
+
+    /**
+     List of state events (array of MXEvent).
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+@end
+
+/**
+ `MXRoomSyncUnreadNotifications` represents the unread counts for a room.
+ */
+@interface MXRoomSyncUnreadNotifications : MXJSONModel
+
+    /**
+     The number of unread messages that match the push notification rules.
+     */
+    @property (nonatomic) NSUInteger notificationCount;
+
+    /**
+     The number of highlighted unread messages (subset of notifications).
+     */
+    @property (nonatomic) NSUInteger highlightCount;
+
+@end
+
+/**
+ `MXRoomSyncSummary` represents the summary of a room.
+ */
+@interface MXRoomSyncSummary : MXJSONModel
+
+/**
+ Present only if the room has no m.room.name or m.room.canonical_alias.
+ Lists the mxids of the first 5 members in the room who are currently joined or
+ invited (ordered by stream ordering as seen on the server).
+ */
+@property (nonatomic) NSArray<NSString*> *heroes;
+
+/**
+ The number of m.room.members in state ‘joined’ (including the syncing user).
+ -1 means the information was not sent by the server.
+ */
+@property (nonatomic) NSUInteger joinedMemberCount;
+
+/**
+ The number of m.room.members in state ‘invited’.
+ -1 means the information was not sent by the server.
+ */
+@property (nonatomic) NSUInteger invitedMemberCount;
+
+@end
+
+
+/**
+ `MXRoomSync` represents the response for a room during server sync.
+ */
+@interface MXRoomSync : MXJSONModel
+
+    /**
+     The state updates for the room.
+     */
+    @property (nonatomic) MXRoomSyncState *state;
+
+    /**
+     The timeline of messages and state changes in the room.
+     */
+    @property (nonatomic) MXRoomSyncTimeline *timeline;
+
+    /**
+     The ephemeral events in the room that aren't recorded in the timeline or state of the room (e.g. typing, receipts).
+     */
+    @property (nonatomic) MXRoomSyncEphemeral *ephemeral;
+
+    /**
+     The account data events for the room (e.g. tags).
+     */
+    @property (nonatomic) MXRoomSyncAccountData *accountData;
+
+    /**
+     The notification counts for the room.
+     */
+    @property (nonatomic) MXRoomSyncUnreadNotifications *unreadNotifications;
+
+    /**
+     The room summary. Sent in case of lazy-loading of members.
+     */
+    @property (nonatomic) MXRoomSyncSummary *summary;
+
+@end
+
+/**
+ `MXInvitedRoomSync` represents a room invitation during server sync.
+ */
+@interface MXInvitedRoomSync : MXJSONModel
+
+    /**
+     The state of a room that the user has been invited to. These state events may only have the 'sender', 'type', 'state_key'
+     and 'content' keys present. These events do not replace any state that the client already has for the room, for example if
+     the client has archived the room. Instead the client should keep two separate copies of the state: the one from the 'invite_state'
+     and one from the archived 'state'. If the client joins the room then the current state will be given as a delta against the
+     archived 'state' not the 'invite_state'.
+     */
+    @property (nonatomic) MXRoomInviteState *inviteState;
+
+@end
+
+/**
+ `MXGroupSyncProfile` represents the profile of a group.
+ */
+@interface MXGroupSyncProfile : MXJSONModel
+
+    /**
+     The name of the group, if any. May be nil.
+     */
+    @property (nonatomic) NSString *name;
+
+    /**
+     The URL for the group's avatar. May be nil.
+     */
+    @property (nonatomic) NSString *avatarUrl;
+
+@end
+
+/**
+ `MXInvitedGroupSync` represents a group invitation during server sync.
+ */
+@interface MXInvitedGroupSync : MXJSONModel
+
+    /**
+     The identifier of the inviter.
+     */
+    @property (nonatomic) NSString *inviter;
+
+    /**
+     The group profile.
+     */
+    @property (nonatomic) MXGroupSyncProfile *profile;
+
+@end
+
+/**
+ `MXRoomsSyncResponse` represents the rooms list in server sync response.
+ */
+@interface MXRoomsSyncResponse : MXJSONModel
+
+    /**
+     Joined rooms: keys are rooms ids.
+     */
+    @property (nonatomic) NSDictionary<NSString*, MXRoomSync*> *join;
+
+    /**
+     Invitations. The rooms that the user has been invited to: keys are rooms ids.
+     */
+    @property (nonatomic) NSDictionary<NSString*, MXInvitedRoomSync*> *invite;
+
+    /**
+     Left rooms. The rooms that the user has left or been banned from: keys are rooms ids.
+     */
+    @property (nonatomic) NSDictionary<NSString*, MXRoomSync*> *leave;
+
+@end
+
+/**
+ `MXGroupsSyncResponse` represents the groups list in server sync response.
+ */
+@interface MXGroupsSyncResponse : MXJSONModel
+
+    /**
+     Joined groups: An array of groups ids.
+     */
+    @property (nonatomic) NSArray<NSString*> *join;
+
+    /**
+     Invitations. The groups that the user has been invited to: keys are groups ids.
+     */
+    @property (nonatomic) NSDictionary<NSString*, MXInvitedGroupSync*> *invite;
+
+    /**
+     Left groups. An array of groups ids: the groups that the user has left or been banned from.
+     */
+    @property (nonatomic) NSArray<NSString*> *leave;
+
+@end
+
+/**
+ `MXPresenceSyncResponse` represents the updates to the presence status of other users during server sync.
+ */
+@interface MXPresenceSyncResponse : MXJSONModel
+
+    /**
+     List of presence events (array of MXEvent with type m.presence).
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+@end
+
+/**
+ `MXToDeviceSyncResponse` represents the data directly sent to one of user's devices.
+ */
+@interface MXToDeviceSyncResponse : MXJSONModel
+
+    /**
+     List of direct-to-device events.
+     */
+    @property (nonatomic) NSArray<MXEvent*> *events;
+
+@end
+
+
+/**
+ `MXDeviceListResponse` represents the devices that have changed.
+ */
+@interface MXDeviceListResponse : MXJSONModel
+
+    /**
+     List of user ids whose devices have changed (new, removed).
+     */
+    @property (nonatomic) NSArray<NSString*> *changed;
+
+    /**
+     List of user ids who are no more tracked.
+     */
+    @property (nonatomic) NSArray<NSString*> *left;
+
+@end
+
+/**
+ `MXSyncResponse` represents the request response for server sync.
+ */
+@interface MXSyncResponse : MXJSONModel
+
+    /**
+     The user private data.
+     */
+    @property (nonatomic) NSDictionary *accountData;
+
+    /**
+     The opaque token for the end.
+     */
+    @property (nonatomic) NSString *nextBatch;
+
+    /**
+     The updates to the presence status of other users.
+     */
+    @property (nonatomic) MXPresenceSyncResponse *presence;
+
+    /**
+     Data directly sent to one of user's devices.
+     */
+    @property (nonatomic) MXToDeviceSyncResponse *toDevice;
+
+    /**
+     Devices list update.
+     */
+    @property (nonatomic) MXDeviceListResponse *deviceLists;
+
+    /**
+     The number of one time keys the server has for our device.
+     algorithm -> number of keys for that algorithm.
+     */
+    @property (nonatomic) NSDictionary<NSString *, NSNumber*> *deviceOneTimeKeysCount;
+
+    /**
+     List of rooms.
+     */
+    @property (nonatomic) MXRoomsSyncResponse *rooms;
+
+    /**
+     List of groups.
+     */
+    @property (nonatomic) MXGroupsSyncResponse *groups;
+
+@end
+
+#pragma mark - Voice over IP
+#pragma mark -
+
+/**
+ `MXCallOffer` represents a call session description.
+ */
+@interface MXCallSessionDescription : MXJSONModel
+
+    /**
+     The type of session description. Can be 'offer' or 'answer'.
+     */
+    @property (nonatomic) NSString *type;
+
+    /**
+     The SDP text of the session description.
+     */
+    @property (nonatomic) NSString *sdp;
+
+@end
+
+/**
+ `MXCallInviteEventContent` represents the content of a m.call.invite event.
+ */
+@interface MXCallInviteEventContent : MXJSONModel
+
+    /**
+     A unique identifier for the call.
+     */
+    @property (nonatomic) NSString *callId;
+
+    /**
+     The session description.
+     */
+    @property (nonatomic) MXCallSessionDescription *offer;
+
+    /**
+     The version of the VoIP specification this message adheres to.
+     */
+    @property (nonatomic) NSUInteger version;
+
+    /**
+     The time in milliseconds that the invite is valid for. 
+     Once the invite age exceeds this value, clients should discard it.
+     They should also no longer show the call as awaiting an answer in the UI.
+     */
+    @property (nonatomic) NSUInteger lifetime;
+
+    /**
+     Indicate whether the invitation is for a video call.
+     */
+    - (BOOL)isVideoCall;
+
+@end
+
+/**
+ `MXCallCandidate` represents a candidate description.
+ */
+@interface MXCallCandidate : MXJSONModel
+
+    /**
+     The SDP media type this candidate is intended for.
+     */
+    @property (nonatomic) NSString *sdpMid;
+
+    /**
+     The index of the SDP 'm' line this candidate is intended for.
+     */
+    @property (nonatomic) NSUInteger sdpMLineIndex;
+
+    /**
+     The SDP 'a' line of the candidate.
+     */
+    @property (nonatomic) NSString *candidate;
+
+@end
+
+/**
+ `MXCallCandidatesEventContent` represents the content of a m.call.candidates event.
+ */
+@interface MXCallCandidatesEventContent : MXJSONModel
+
+    /**
+     The ID of the call this event relates to.
+     */
+    @property (nonatomic) NSString *callId;
+
+    /**
+     The version of the VoIP specification this message adheres to.
+     */
+    @property (nonatomic) NSUInteger version;
+
+    /**
+     Array of object describing the candidates (@see MXCallCandidate).
+     */
+    @property (nonatomic) NSArray *candidates;
+
+@end
+
+/**
+ `MXCallAnswerEventContent` represents the content of a m.call.answer event.
+ */
+@interface MXCallAnswerEventContent : MXJSONModel
+
+    /**
+     A unique identifier for the call.
+     */
+    @property (nonatomic) NSString *callId;
+
+    /**
+     The version of the VoIP specification this message adheres to.
+     */
+    @property (nonatomic) NSUInteger version;
+
+    /**
+     The session description.
+     */
+    @property (nonatomic) MXCallSessionDescription *answer;
+
+@end
+
+/**
+ `MXCallHangupEventContent` represents the content of a m.call.hangup event.
+ */
+@interface MXCallHangupEventContent : MXJSONModel
+
+    /**
+     A unique identifier for the call.
+     */
+    @property (nonatomic) NSString *callId;
+
+    /**
+     The version of the VoIP specification this message adheres to.
+     */
+    @property (nonatomic) NSUInteger version;
+
+@end
+
+/**
+ `MXTurnServerResponse` represents the response to turnServer request.
+ It provides TURN server configuration advised by the homeserver.
+ */
+@interface MXTurnServerResponse : MXJSONModel
+
+    /**
+     The username of the Matrix user on the TURN server.
+     */
+    @property (nonatomic) NSString *username;
+
+    /**
+     The associated password.
+     */
+    @property (nonatomic) NSString *password;
+
+    /**
+     The list URIs of TURN servers - including STUN servers.
+     The URI scheme obeys to http://tools.ietf.org/html/rfc7064#section-3.1 
+     and http://tools.ietf.org/html/rfc7065#section-3.1
+     */
+    @property (nonatomic) NSArray *uris;
+
+    /**
+     Time To Live. The time is seconds this data is still valid.
+     It is computed by the user's homeserver when the request is made.
+     Then, the SDK updates the property each time it is read.
+     */
+    @property (nonatomic) NSUInteger ttl;
+
+    /**
+     The `ttl` value transcoded to an absolute date, a timestamp in milliseconds
+     based on the device clock.
+     */
+    @property (nonatomic) uint64_t ttlExpirationLocalTs;
+@end
+
+
 #pragma mark - Crypto
 /**
  `MXKeysUploadResponse` represents the response to /keys/upload request made by
@@ -1151,6 +1700,34 @@ FOUNDATION_EXPORT NSString *const kMXPushRuleScopeStringDevice;
      Instead, the corresponding user or device is missing from the one_time_keys result.
      */
     @property (nonatomic) NSDictionary *failures;
+
+@end
+
+#pragma mark - Device Management
+/**
+ `MXDevice` represents a device of the current user.
+ */
+@interface MXDevice : MXJSONModel
+
+    /**
+     A unique identifier of the device.
+     */
+    @property (nonatomic) NSString *deviceId;
+
+    /**
+     The display name set by the user for this device. Absent if no name has been set.
+     */
+    @property (nonatomic) NSString *displayName;
+
+    /**
+     The IP address where this device was last seen. (May be a few minutes out of date, for efficiency reasons).
+     */
+    @property (nonatomic) NSString *lastSeenIp;
+
+    /**
+     The timestamp (in milliseconds since the unix epoch) when this devices was last seen. (May be a few minutes out of date, for efficiency reasons).
+     */
+    @property (nonatomic) uint64_t lastSeenTs;
 
 @end
 
@@ -1373,127 +1950,3 @@ FOUNDATION_EXPORT NSString *const kMXPushRuleScopeStringDevice;
     @property (nonatomic) NSArray<MXGroupUser*> *chunk;
 
 @end
-
-/**
- `MXRoomJoinRuleResponse` represents the enhanced join rule response as per [MSC3083](https://github.com/matrix-org/matrix-doc/pull/3083)
- */
-@interface MXRoomJoinRuleResponse : MXJSONModel
-
-@property (nonatomic) MXRoomJoinRule joinRule;
-
-@property (nonatomic, nullable) NSArray<NSString *> *allowedParentIds;
-
-@end
-
-#pragma mark - Dehydration
-
-/**
- `MXDehydratedDevice` represents the dehydrated device of the current user.
- */
-@interface MXDehydratedDevice : MXJSONModel
-
-    /**
-     A unique identifier of the device.
-     */
-    @property (nonatomic) NSString *deviceId;
-
-    /**
-     The encrypted account data of the dehydrated device (libolm's pickle format)
-     */
-    @property (nonatomic) NSString *account;
-
-    /**
-     The algorithm used for encrypting the account data
-     */
-    @property (nonatomic) NSString *algorithm;
-
-    /**
-     The passphrase used for encrypting the account data (optional)
-     */
-    @property (nonatomic) NSString *passphrase;
-
-@end
-
-#pragma mark - Homeserver Capabilities
-
-@interface MXRoomVersionInfo: NSObject
-
-    /**
-     * version fo the room
-     */
-    @property (nonatomic) NSString *version;
-
-    /**
-     * Status of the room version: "stable" or "unstable"
-     */
-    @property (nonatomic) NSString *statusString;
-
-@end
-
-/**
- * give the list of capabilities of the server and their related room versions
- *
- *  "room_capabilities": {
- *      "knock" : {
- *              "preferred": "7",
- *              "support" : ["7"]
- *      },
- *      "restricted" : {
- *              "preferred": "9",
- *              "support" : ["8", "9"]
- *      }
- * }
- */
-@interface MXRoomCapabilitySupport: MXJSONModel
-
-    /**
-     * Preferred version for this capability
-     */
-    @property (nonatomic) NSString *preferred;
-
-    /**
-     * List of room versions that support this capability
-     */
-    @property (nonatomic) NSArray<NSString *> *support;
-
-@end
-
-@interface MXRoomVersionCapabilities: MXJSONModel
-
-    /**
-     * Actual default version used for creating rooms in this server
-     */
-    @property (nonatomic) NSString *defaultRoomVersion;
-
-    /**
-     * Keys are capabilities defined per spec, as for now knock or restricted
-     */
-    @property (nonatomic) NSArray<MXRoomVersionInfo *> *supportedVersions;
-
-    /**
-     * Keys are capabilities defined per spec, as for now knock or restricted
-     */
-    @property (nonatomic, nullable) NSDictionary<NSString *, MXRoomCapabilitySupport *> *roomCapabilities;
-
-@end
-
-/**
- `MXHomeserverCapabilities` the capabilities of the current homeserver
- */
-@interface MXHomeserverCapabilities : MXJSONModel
-
-    /**
-     * True if it is possible to change the password of the account.
-     */
-    @property (nonatomic) BOOL canChangePassword;
-
-    /**
-     * Room versions supported by the server
-     * This capability describes the default and available room versions a server supports, and at what level of stability.
-     * Clients should make use of this capability to determine if users need to be encouraged to upgrade their rooms.
-     */
-    @property (nonatomic, nullable) MXRoomVersionCapabilities *roomVersions;
-
-@end
-
-MX_ASSUME_MISSING_NULLABILITY_END

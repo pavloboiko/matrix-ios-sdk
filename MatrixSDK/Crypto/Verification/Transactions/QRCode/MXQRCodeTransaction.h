@@ -40,12 +40,14 @@ typedef NS_ENUM(NSInteger, MXQRCodeTransactionState) {
 /**
  An handler on an interactive device verification based on QR Code.
  */
+@interface MXQRCodeTransaction : MXKeyVerificationTransaction
 
-@protocol MXQRCodeTransaction <MXKeyVerificationTransaction>
+@property (nonatomic) MXQRCodeTransactionState state;
 
-@property (nonatomic, readonly) MXQRCodeTransactionState state;
-
-@property (nonatomic, strong, nullable, readonly) MXQRCodeData *qrCodeData;
+/**
+ Start the key verification process.
+ */
+- (void)userHasScannedOtherQrCodeRawData:(NSData*)otherQRCodeRawData;
 
 /**
  Start the key verification process.
@@ -56,10 +58,6 @@ typedef NS_ENUM(NSInteger, MXQRCodeTransactionState) {
  Indicate if QR code verification was intended or not.
  */
 - (void)otherUserScannedMyQrCode:(BOOL)otherUserScanned;
-
-@end
-
-@interface MXLegacyQRCodeTransaction : MXLegacyKeyVerificationTransaction <MXQRCodeTransaction>
 
 @end
 

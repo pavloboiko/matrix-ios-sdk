@@ -16,12 +16,8 @@
 
 #import "MXJingleCallStack.h"
 
-#import "MXLog.h"
 #import "MXJingleCallStackCall.h"
 #import <WebRTC/RTCPeerConnectionFactory.h>
-#import <WebRTC/RTCDefaultVideoEncoderFactory.h>
-#import <WebRTC/RTCDefaultVideoDecoderFactory.h>
-#import <WebRTC/RTCCallbackLogger.h>
 
 @interface MXJingleCallStack ()
 {
@@ -32,36 +28,12 @@
 
 @implementation MXJingleCallStack
 
-+ (void)load
-{
-    static RTC_OBJC_TYPE(RTCCallbackLogger) *CallBackLogger;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        CallBackLogger = [[RTC_OBJC_TYPE(RTCCallbackLogger) alloc] init];
-#if DEBUG
-        CallBackLogger.severity = RTCLoggingSeverityInfo;
-#else
-        CallBackLogger.severity = RTCLoggingSeverityError;
-#endif
-        [CallBackLogger start:^(NSString * _Nonnull message) {
-            MXLogDebug(@"[WebRTC] %@", message);
-        }];
-    });
-}
-
 - (instancetype)init
 {
     self = [super init];
     if (self)
     {
-        //  Use RTCDefaultVideoEncoderFactory as it's enabling all codecs in WebRTC
-        id<RTCVideoEncoderFactory> encoderFactory = [[RTCDefaultVideoEncoderFactory alloc] init];
-        
-        //  Use RTCDefaultVideoDecoderFactory as it's enabling all codecs in WebRTC
-        id<RTCVideoDecoderFactory> decoderFactory = [[RTCDefaultVideoDecoderFactory alloc] init];
-        peerConnectionFactory = [[RTCPeerConnectionFactory alloc] initWithEncoderFactory:encoderFactory
-                                                                          decoderFactory:decoderFactory];
-
+        peerConnectionFactory = [[RTCPeerConnectionFactory alloc] init];
     }
     return self;
 }

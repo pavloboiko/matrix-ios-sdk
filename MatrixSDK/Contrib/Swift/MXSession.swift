@@ -11,14 +11,6 @@ import Foundation
 
 
 public extension MXSession {
-    enum Error: Swift.Error {
-        case missingRoom
-    }
-    
-    /// Module that manages threads
-    var threadingService: MXThreadingService {
-        return __threadingService
-    }
     
     /**
      Start fetching events from the home server.
@@ -62,15 +54,15 @@ public extension MXSession {
      Perform an events stream catchup in background (by keeping user offline).
      
      - parameters:
-        - clientTimeout: the max time to perform the catchup for the client side (in seconds)
-        - ignoreSessionState: set true to force the sync, otherwise considers session state equality to paused. Defaults to false.
+        - timeout: the max time to perform the catchup
         - completion: A block called when the SDK has completed a catchup, or times out.
         - response: Indicates whether the sync was successful.
      */
-    @nonobjc func backgroundSync(withTimeout clientTimeout: TimeInterval = 0, ignoreSessionState: Bool = false, completion: @escaping (_ response: MXResponse<Void>) -> Void) {
-        let clientTimeoutMilliseconds = UInt32(clientTimeout * 1000)
-        __backgroundSync(clientTimeoutMilliseconds, ignoreSessionState: ignoreSessionState, success: currySuccess(completion), failure: curryFailure(completion))
+    @nonobjc func backgroundSync(withTimeout timeout: TimeInterval, completion: @escaping (_ response: MXResponse<Void>) -> Void) {
+        let timeoutMilliseconds = UInt32(timeout * 1000)
+        __backgroundSync(timeoutMilliseconds, success: currySuccess(completion), failure: curryFailure(completion))
     }
+    
     
     
     
@@ -145,82 +137,8 @@ public extension MXSession {
     
     
     
-    /// Create a new room with the given parameters.
-    /// - Parameters:
-    ///   - name: Name of the room
-    ///   - joinRule: join rule of the room: can be `public`, `restricted`, or `private`
-    ///   - topic: topic of the room
-    ///   - parentRoomId: Optional parent room ID. Required for `restricted` join rule
-    ///   - aliasLocalPart: local part of the alias (required for `public` room)
-    ///   (e.g. for the alias "#my_alias:example.org", the local part is "my_alias")
-    ///   - isEncrypted: `true` if you want to enable encryption for this room. `false` otherwise.
-    ///   - completion: A closure called when the operation completes. Provides the instance of created room in case of success.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func createRoom(withName name: String,
-                                                joinRule: MXRoomJoinRule,
-                                                topic: String? = nil,
-                                                parentRoomId: String? = nil,
-                                                aliasLocalPart: String? = nil,
-                                                isEncrypted: Bool = true,
-                                                completion: @escaping (_ response: MXResponse<MXRoom>) -> Void) -> MXHTTPOperation? {
-        let parameters = MXRoomCreationParameters()
-        parameters.name = name
-        parameters.topic = topic
-        parameters.roomAlias = aliasLocalPart
-        
-        let stateEventBuilder = MXRoomInitialStateEventBuilder()
-        
-        switch joinRule {
-        case .public:
-            if aliasLocalPart == nil {
-                MXLog.warning("[MXSession] createRoom: creating public room \"\(name)\" without alias")
-            }
-            parameters.preset = kMXRoomPresetPublicChat
-            parameters.visibility = kMXRoomDirectoryVisibilityPublic
-            let guestAccessStateEvent = stateEventBuilder.buildGuestAccessEvent(withAccess: .canJoin)
-            parameters.addOrUpdateInitialStateEvent(guestAccessStateEvent)
-            let historyVisibilityStateEvent = stateEventBuilder.buildHistoryVisibilityEvent(withVisibility: .worldReadable)
-            parameters.addOrUpdateInitialStateEvent(historyVisibilityStateEvent)
-        case .restricted:
-            let guestAccessStateEvent = stateEventBuilder.buildGuestAccessEvent(withAccess: .forbidden)
-            parameters.addOrUpdateInitialStateEvent(guestAccessStateEvent)
-            
-            let historyVisibilityStateEvent = stateEventBuilder.buildHistoryVisibilityEvent(withVisibility: .shared)
-            parameters.addOrUpdateInitialStateEvent(historyVisibilityStateEvent)
-            
-            let joinRuleSupportType = homeserverCapabilitiesService.isFeatureSupported(.restricted)
-            if joinRuleSupportType == .supported || joinRuleSupportType == .supportedUnstable {
-                guard let parentRoomId = parentRoomId else {
-                    fatalError("[MXSession] createRoom: parentRoomId is required for restricted room")
-                }
-                
-                parameters.roomVersion = homeserverCapabilitiesService.versionOverrideForFeature(.restricted)
-                let joinRuleStateEvent = stateEventBuilder.buildJoinRuleEvent(withJoinRule: .restricted, allowedParentsList: [parentRoomId])
-                parameters.addOrUpdateInitialStateEvent(joinRuleStateEvent)
-            } else {
-                let joinRuleStateEvent = stateEventBuilder.buildJoinRuleEvent(withJoinRule: .invite)
-                parameters.addOrUpdateInitialStateEvent(joinRuleStateEvent)
-            }
-        default:
-            parameters.preset = kMXRoomPresetPrivateChat
-            let guestAccessStateEvent = stateEventBuilder.buildGuestAccessEvent(withAccess: .forbidden)
-            parameters.addOrUpdateInitialStateEvent(guestAccessStateEvent)
-            let historyVisibilityStateEvent = stateEventBuilder.buildHistoryVisibilityEvent(withVisibility: .shared)
-            parameters.addOrUpdateInitialStateEvent(historyVisibilityStateEvent)
-            let joinRuleStateEvent = stateEventBuilder.buildJoinRuleEvent(withJoinRule: .invite)
-            parameters.addOrUpdateInitialStateEvent(joinRuleStateEvent)
-        }
-        
-        if isEncrypted {
-            let encryptionStateEvent = stateEventBuilder.buildAlgorithmEvent(withAlgorithm: kMXCryptoMegolmAlgorithm)
-            parameters.addOrUpdateInitialStateEvent(encryptionStateEvent)
-        }
-
-        return createRoom(parameters: parameters) { response in
-            completion(response)
-        }
-    }
-
+    
+    
 
     /**
      Create a room.
@@ -252,23 +170,9 @@ public extension MXSession {
         return __createRoom(parameters, success: currySuccess(completion), failure: curryFailure(completion))
     }
     
-    /**
-     Return the first joined direct chat listed in account data for this user,
-     or it will create one if no room exists yet.
-     */
-    func getOrCreateDirectJoinedRoom(with userId: String) async throws -> MXRoom {
-        try await withCheckedThrowingContinuation { continuation in
-            _ = getOrCreateDirectJoinedRoom(withUserId: userId) { room in
-                if let room = room {
-                    continuation.resume(returning: room)
-                } else {
-                    continuation.resume(throwing: Error.missingRoom)
-                }
-            } failure: { error in
-                continuation.resume(throwing: error ?? Error.missingRoom)
-            }
-        }
-    }
+    
+    
+    
     
     /**
      Join a room, optionally where the user has been invited by a 3PID invitation.
@@ -380,39 +284,14 @@ public extension MXSession {
     @nonobjc func listenToEvents(_ types: [MXEventType]? = nil, _ block: @escaping MXOnSessionEvent) -> Any {
         let legacyBlock: __MXOnSessionEvent = { (event, direction, customObject) in
             guard let event = event else { return }
-            block(event, direction, customObject)
+            block(event, MXTimelineDirection(identifer: direction), customObject)
         }
         
         if let types = types {
             let typeStrings = types.map({ return $0.identifier })
-            return __listen(toEventsOfTypes: typeStrings, onEvent: legacyBlock) as Any
+            return __listen(toEventsOfTypes: typeStrings, onEvent: legacyBlock)
         } else {
-            return __listen(toEvents: legacyBlock) as Any
+            return __listen(toEvents: legacyBlock)
         }
-    }
-
-    /// Fetch an event from the session store, or from the homeserver if required.
-    /// - Parameters:
-    ///   - eventId: Event identifier to be fetched.
-    ///   - roomId: Room identifier for the event.
-    ///   - completion: Completion block to be called at the end of the process.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func event(withEventId eventId: String, inRoom roomId: String?, _ completion: @escaping (_ response: MXResponse<MXEvent>) -> Void) -> MXHTTPOperation {
-        return __event(withEventId: eventId, inRoom: roomId, success: currySuccess(completion), failure: curryFailure(completion))
-    }
-
-    //  MARK: - Homeserver Information
-
-    /// The homeserver capabilities
-    var homeserverCapabilities: MXCapabilities? {
-        return __homeserverCapabilities
-    }
-
-    /// Matrix versions supported by the homeserver.
-    /// 
-    /// - Parameter completion: A block object called when the operation completes.
-    /// - Returns: a `MXHTTPOperation` instance.
-    @nonobjc @discardableResult func supportedMatrixVersions(_ completion: @escaping (_ response: MXResponse<MXMatrixVersions>) -> Void) -> MXHTTPOperation {
-        return __supportedMatrixVersions(currySuccess(completion), failure: curryFailure(completion))
     }
 }

@@ -40,8 +40,6 @@
 
 #import "MXQRCodeDataBuilder.h"
 
-#import "MatrixSDKSwiftHeader.h"
-
 #pragma mark - Constants
 
 NSString *const MXKeyVerificationErrorDomain = @"org.matrix.sdk.verification";
@@ -59,19 +57,19 @@ NSTimeInterval const MXRequestDefaultTimeout = 5 * 60.0;
 static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTypes;
 
 
-@interface MXLegacyKeyVerificationManager ()
+@interface MXKeyVerificationManager ()
 {
     // The queue to run background tasks
     dispatch_queue_t cryptoQueue;
 
     // All running transactions
-    MXUsersDevicesMap<MXLegacyKeyVerificationTransaction *> *transactions;
+    MXUsersDevicesMap<MXKeyVerificationTransaction*> *transactions;
     // Timer to cancel transactions
     NSTimer *transactionTimeoutTimer;
 
     // All pending requests
     // Request id -> request
-    NSMutableDictionary<NSString*, MXLegacyKeyVerificationRequest*> *pendingRequestsMap;
+    NSMutableDictionary<NSString*, MXKeyVerificationRequest*> *pendingRequestsMap;
 
     // Timer to cancel requests
     NSTimer *requestTimeoutTimer;
@@ -81,15 +79,9 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 @property (nonatomic, strong) MXQRCodeDataBuilder *qrCodeDataBuilder;
 
-/**
- The timeout for requests.
- Default is 5 min.
- */
-@property (nonatomic) NSTimeInterval requestTimeout;
-
 @end
 
-@implementation MXLegacyKeyVerificationManager
+@implementation MXKeyVerificationManager
 
 #pragma mark - Public methods -
 
@@ -98,10 +90,10 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 - (void)requestVerificationByToDeviceWithUserId:(NSString*)userId
                                       deviceIds:(nullable NSArray<NSString*>*)deviceIds
                                         methods:(NSArray<NSString*>*)methods
-                                        success:(void(^)(id<MXKeyVerificationRequest> request))success
+                                        success:(void(^)(MXKeyVerificationRequest *request))success
                                         failure:(void(^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] requestVerificationByToDeviceWithUserId: %@. deviceIds: %@", userId, deviceIds);
+    NSLog(@"[MXKeyVerification] requestVerificationByToDeviceWithUserId: %@. deviceIds: %@", userId, deviceIds);
     if (deviceIds.count)
     {
         [self requestVerificationByToDeviceWithUserId2:userId deviceIds:deviceIds methods:methods success:success failure:failure];
@@ -148,7 +140,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 - (void)requestVerificationByToDeviceWithUserId2:(NSString*)userId
                                        deviceIds:(NSArray<NSString*>*)deviceIds
                                          methods:(NSArray<NSString*>*)methods
-                                         success:(void(^)(id<MXKeyVerificationRequest> request))success
+                                         success:(void(^)(MXKeyVerificationRequest *request))success
                                          failure:(void(^)(NSError *error))failure
 {
     NSParameterAssert(deviceIds.count > 0);
@@ -166,12 +158,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         [contentMap setObject:requestJSONModel.JSONDictionary forUser:userId andDevice:deviceId];
     }
     
-    MXToDevicePayload *payload = [[MXToDevicePayload alloc]
-                                  initWithEventType:kMXMessageTypeKeyVerificationRequest
-                                  contentMap:contentMap
-                                  transactionId:nil
-                                  addMessageId:NO]; // Should not add anything for verification events as it would break their signatures
-    [self.crypto.matrixRestClient sendToDevice:payload success:^{
+    [self.crypto.matrixRestClient sendToDevice:kMXMessageTypeKeyVerificationRequest contentMap:contentMap txnId:nil success:^{
         
         MXEvent *event = [MXEvent modelFromJSON:@{
                                                   @"sender": self.crypto.mxSession.myUserId,
@@ -191,7 +178,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                                    roomId:(nullable NSString*)roomId
                              fallbackText:(NSString*)fallbackText
                                   methods:(NSArray<NSString*>*)methods
-                                  success:(void(^)(id<MXKeyVerificationRequest> request))success
+                                  success:(void(^)(MXKeyVerificationRequest *request))success
                                   failure:(void(^)(NSError *error))failure
 {
     if (roomId)
@@ -200,14 +187,30 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
     else
     {
-        [self.crypto.mxSession getOrCreateDirectJoinedRoomWithUserId:userId success:^(MXRoom *room) {
-            [self requestVerificationByDMWithUserId2:userId
-                                              roomId:room.roomId
-                                        fallbackText:fallbackText
-                                             methods:methods
-                                             success:success
-                                             failure:failure];
-        } failure:failure];
+        // Use an existing direct room if any
+        MXRoom *room = [self.crypto.mxSession directJoinedRoomWithUserId:userId];
+        if (room)
+        {
+            [self requestVerificationByDMWithUserId2:userId roomId:room.roomId fallbackText:fallbackText methods:methods success:success failure:failure];
+        }
+        else
+        {
+            // Create a new DM with E2E by default if possible
+            [self.crypto.mxSession canEnableE2EByDefaultInNewRoomWithUsers:@[userId] success:^(BOOL canEnableE2E) {
+                MXRoomCreationParameters *roomCreationParameters = [MXRoomCreationParameters parametersForDirectRoomWithUser:userId];
+                
+                if (canEnableE2E)
+                {
+                    roomCreationParameters.initialStateEvents = @[
+                                                                  [MXRoomCreationParameters initialStateEventForEncryptionWithAlgorithm:kMXCryptoMegolmAlgorithm
+                                                                   ]];
+                }
+
+                [self.crypto.mxSession createRoomWithParameters:roomCreationParameters success:^(MXRoom *room) {
+                    [self requestVerificationByDMWithUserId2:userId roomId:room.roomId fallbackText:fallbackText methods:methods success:success failure:failure];
+                } failure:failure];
+            } failure:failure];
+        }
     }
 }
 
@@ -215,10 +218,10 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                                     roomId:(NSString*)roomId
                               fallbackText:(NSString*)fallbackText
                                    methods:(NSArray<NSString*>*)methods
-                                   success:(void(^)(id<MXKeyVerificationRequest> request))success
+                                   success:(void(^)(MXKeyVerificationRequest *request))success
                                    failure:(void(^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] requestVerificationByDMWithUserId: %@. RoomId: %@", userId, roomId);
+    NSLog(@"[MXKeyVerification] requestVerificationByDMWithUserId: %@. RoomId: %@", userId, roomId);
     
     MXKeyVerificationRequestByDMJSONModel *request = [MXKeyVerificationRequestByDMJSONModel new];
     request.body = fallbackText;
@@ -230,9 +233,9 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         
         // Build the corresponding the event
         MXRoom *room = [self.crypto.mxSession roomWithRoomId:roomId];
-        MXEvent *event = [room fakeRoomMessageEventWithEventId:eventId andContent:request.JSONDictionary threadId:nil];
+        MXEvent *event = [room fakeRoomMessageEventWithEventId:eventId andContent:request.JSONDictionary];
         
-        MXLegacyKeyVerificationRequest *request = [self verificationRequestInDMEvent:event];
+        MXKeyVerificationRequest *request = [self verificationRequestInDMEvent:event];
         [request updateState:MXKeyVerificationRequestStatePending notifiy:YES];
         [self addPendingRequest:request notify:NO];
         
@@ -242,7 +245,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 #pragma mark Current requests
 
-- (NSArray<id<MXKeyVerificationRequest>> *)pendingRequests
+- (NSArray<MXKeyVerificationRequest*> *)pendingRequests
 {
     return pendingRequestsMap.allValues;
 }
@@ -250,12 +253,21 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 #pragma mark Transactions
 
-- (void)beginKeyVerificationFromRequest:(id<MXKeyVerificationRequest>)request
+- (void)beginKeyVerificationWithUserId:(NSString*)userId
+                           andDeviceId:(NSString*)deviceId
+                                method:(NSString*)method
+                               success:(void(^)(MXKeyVerificationTransaction *transaction))success
+                               failure:(void(^)(NSError *error))failure
+{
+    [self beginKeyVerificationWithUserId:userId andDeviceId:deviceId transactionId:nil dmRoomId:nil dmEventId:nil method:method success:success failure:failure];
+}
+
+- (void)beginKeyVerificationFromRequest:(MXKeyVerificationRequest*)request
                                  method:(NSString*)method
-                                success:(void(^)(id<MXKeyVerificationTransaction> transaction))success
+                                success:(void(^)(MXKeyVerificationTransaction *transaction))success
                                 failure:(void(^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] beginKeyVerificationFromRequest: event: %@", request.requestId);
+    NSLog(@"[MXKeyVerification] beginKeyVerificationFromRequest: event: %@", request.requestId);
     
     // Sanity checks
     if (!request.otherDevice)
@@ -286,7 +298,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             if ([request isKindOfClass:MXKeyVerificationByDMRequest.class])
             {
                 MXKeyVerificationByDMRequest *requestByDM = (MXKeyVerificationByDMRequest*)request;
-                [self beginKeyVerificationWithUserId:request.otherUser andDeviceId:request.otherDevice transactionId:request.requestId dmRoomId:requestByDM.roomId dmEventId:requestByDM.eventId method:method success:^(id<MXKeyVerificationTransaction> transaction) {
+                [self beginKeyVerificationWithUserId:request.otherUser andDeviceId:request.otherDevice transactionId:request.requestId dmRoomId:requestByDM.roomId dmEventId:requestByDM.eventId method:method success:^(MXKeyVerificationTransaction *transaction) {
                     [self removePendingRequestWithRequestId:request.requestId];
                     success(transaction);
                 } failure:failure];
@@ -294,7 +306,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             break;
             
         case MXKeyVerificationTransportToDevice:
-            [self beginKeyVerificationWithUserId:request.otherUser andDeviceId:request.otherDevice transactionId:request.requestId dmRoomId:nil dmEventId:nil method:method success:^(id<MXKeyVerificationTransaction> _Nonnull transaction) {
+            [self beginKeyVerificationWithUserId:request.otherUser andDeviceId:request.otherDevice transactionId:request.requestId dmRoomId:nil dmEventId:nil method:method success:^(MXKeyVerificationTransaction * _Nonnull transaction) {
                 [self removePendingRequestWithRequestId:request.requestId];
                 success(transaction);
             } failure:failure];
@@ -308,15 +320,15 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                               dmRoomId:(nullable NSString*)dmRoomId
                              dmEventId:(nullable NSString*)dmEventId
                                 method:(NSString*)method
-                               success:(void(^)(id<MXKeyVerificationTransaction> transaction))success
+                               success:(void(^)(MXKeyVerificationTransaction *transaction))success
                                failure:(void(^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] beginKeyVerification: device: %@:%@ roomId: %@ method:%@", userId, deviceId, dmRoomId, method);
+    NSLog(@"[MXKeyVerification] beginKeyVerification: device: %@:%@ roomId: %@ method:%@", userId, deviceId, dmRoomId, method);
 
     // Make sure we have other device keys
     [self loadDeviceWithDeviceId:deviceId andUserId:userId success:^(MXDeviceInfo *otherDevice) {
 
-        id<MXKeyVerificationTransaction> transaction;
+        MXKeyVerificationTransaction *transaction;
         NSError *error;
 
         // We support only SAS at the moment
@@ -360,17 +372,17 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         });
 
     } failure:^(NSError *error) {
-        MXLogDebug(@"[MXKeyVerification] beginKeyVerification: Error: %@", error);
+        NSLog(@"[MXKeyVerification] beginKeyVerification: Error: %@", error);
         failure(error);
     }];
 }
 
-- (void)createQRCodeTransactionFromRequest:(id<MXKeyVerificationRequest>)request
+- (void)createQRCodeTransactionFromRequest:(MXKeyVerificationRequest*)request
                                 qrCodeData:(nullable MXQRCodeData*)qrCodeData
-                                   success:(void(^)(MXLegacyQRCodeTransaction *transaction))success
+                                   success:(void(^)(MXQRCodeTransaction *transaction))success
                                    failure:(void(^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] createQRCodeTransactionFromRequest: event: %@", request.requestId);
+    NSLog(@"[MXKeyVerification] createQRCodeTransactionFromRequest: event: %@", request.requestId);
     
     // Sanity checks
     if (!request.otherDevice)
@@ -429,15 +441,15 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                                 transactionId:(nullable NSString*)transactionId
                                      dmRoomId:(nullable NSString*)dmRoomId
                                     dmEventId:(nullable NSString*)dmEventId
-                                      success:(void(^)(MXLegacyQRCodeTransaction *transaction))success
+                                      success:(void(^)(MXQRCodeTransaction *transaction))success
                                       failure:(void(^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] createQRCodeTransaction: device: %@:%@ roomId: %@", userId, deviceId, dmRoomId);
+    NSLog(@"[MXKeyVerification] createQRCodeTransaction: device: %@:%@ roomId: %@", userId, deviceId, dmRoomId);
     
     // Make sure we have other device keys
     [self loadDeviceWithDeviceId:deviceId andUserId:userId success:^(MXDeviceInfo *otherDevice) {
         
-        MXLegacyQRCodeTransaction *transaction = [[MXLegacyQRCodeTransaction alloc] initWithOtherDevice:otherDevice qrCodeData:qrCodeData andManager:self];
+        MXQRCodeTransaction *transaction = [[MXQRCodeTransaction alloc] initWithOtherDevice:otherDevice qrCodeData:qrCodeData andManager:self];
         
         
         if (transactionId)
@@ -473,7 +485,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         });
         
     } failure:^(NSError *error) {
-        MXLogDebug(@"[MXKeyVerification] createQRCodeTransaction: Error: %@", error);
+        NSLog(@"[MXKeyVerification] createQRCodeTransaction: Error: %@", error);
         dispatch_async(dispatch_get_main_queue(), ^{
             failure(error);
         });
@@ -482,7 +494,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)removeQRCodeTransactionWithTransactionId:(NSString*)transactionId
 {
-    MXLegacyQRCodeTransaction *qrCodeTransaction = [self qrCodeTransactionWithTransactionId:transactionId];
+    MXQRCodeTransaction *qrCodeTransaction = [self qrCodeTransactionWithTransactionId:transactionId];
     
     if (qrCodeTransaction)
     {
@@ -490,13 +502,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
 }
 
-- (void)transactions:(void(^)(NSArray<id<MXKeyVerificationTransaction>> *transactions))complete
+- (void)transactions:(void(^)(NSArray<MXKeyVerificationTransaction*> *transactions))complete
 {
     MXWeakify(self);
     dispatch_async(self->cryptoQueue, ^{
         MXStrongifyAndReturnIfNil(self);
 
-        NSArray<id<MXKeyVerificationTransaction>> *transactions = self->transactions.allObjects;
+        NSArray<MXKeyVerificationTransaction*> *transactions = self->transactions.allObjects;
         dispatch_async(dispatch_get_main_queue(), ^{
             complete(transactions);
         });
@@ -507,7 +519,6 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 #pragma mark Verification status
 
 - (nullable MXHTTPOperation *)keyVerificationFromKeyVerificationEvent:(MXEvent*)event
-                                                               roomId:(NSString *)roomId
                                                               success:(void(^)(MXKeyVerification *keyVerification))success
                                                               failure:(void(^)(NSError *error))failure
 {
@@ -548,7 +559,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
     // Original event or one of the thread?
     if (event.eventType == MXEventTypeRoomMessage
-        && [event.content[kMXMessageTypeKey] isEqualToString:kMXMessageTypeKeyVerificationRequest])
+        && [event.content[@"msgtype"] isEqualToString:kMXMessageTypeKeyVerificationRequest])
     {
         keyVerificationId = event.eventId;
     }
@@ -564,8 +575,8 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (nullable MXKeyVerification *)pendingKeyVerificationWithKeyVerificationId:(NSString*)keyVerificationId
 {
-    id<MXKeyVerificationTransaction> transaction = [self transactionWithTransactionId:keyVerificationId];
-    MXLegacyKeyVerificationRequest *request = [self pendingRequestWithRequestId:keyVerificationId];
+    MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:keyVerificationId];
+    MXKeyVerificationRequest *request = [self pendingRequestWithRequestId:keyVerificationId];
     
     return [self->statusResolver keyVerificationFromRequest:request andTransaction:transaction];
 }
@@ -589,7 +600,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     });
 }
 
-- (instancetype)initWithCrypto:(MXLegacyCrypto *)crypto
+- (instancetype)initWithCrypto:(MXCrypto *)crypto
 {
     self = [super init];
     if (self)
@@ -628,13 +639,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 #pragma mark - Requests
 
-- (MXHTTPOperation*)sendToOtherInRequest:(id<MXKeyVerificationRequest>)request
+- (MXHTTPOperation*)sendToOtherInRequest:(MXKeyVerificationRequest*)request
                                eventType:(NSString*)eventType
                                  content:(NSDictionary*)content
                                  success:(dispatch_block_t)success
                                  failure:(void (^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] sendToOtherInRequest: eventType: %@\n%@",
+    NSLog(@"[MXKeyVerification] sendToOtherInRequest: eventType: %@\n%@",
           eventType, content);
     
     MXHTTPOperation *operation;
@@ -676,33 +687,14 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     return operation;
 }
 
-- (void)notifyOthersOfAcceptanceWithTransactionId:(NSString*)transactionId
-                               acceptedUserId:(NSString*)acceptedUserId
-                             acceptedDeviceId:(NSString*)acceptedDeviceId
-                                      success:(void(^)(void))success
-                                      failure:(void(^)(NSError *error))failure
-{
-    [self otherDeviceIdsOfUser:acceptedUserId success:^(NSArray<NSString *> *deviceIds) {
-        NSMutableArray *nonChosenDevices = [deviceIds mutableCopy];
-        [nonChosenDevices removeObject:acceptedDeviceId];
-        
-        MXKeyVerificationCancel *cancel = [MXKeyVerificationCancel new];
-        MXTransactionCancelCode *cancelCode = MXTransactionCancelCode.accepted;
-        cancel.transactionId = transactionId;
-        cancel.code = cancelCode.value;
-        cancel.reason = cancelCode.humanReadable;
-        [self sendToDevices:acceptedUserId deviceIds:nonChosenDevices eventType:kMXEventTypeStringKeyVerificationCancel content:cancel.JSONDictionary success:success failure:failure];
-    } failure:failure];
-}
-
-- (void)cancelVerificationRequest:(id<MXKeyVerificationRequest>)request
+- (void)cancelVerificationRequest:(MXKeyVerificationRequest*)request
                           success:(void(^)(void))success
                           failure:(void(^)(NSError *error))failure
 {
     MXTransactionCancelCode *cancelCode = MXTransactionCancelCode.user;
 
     // If there is transaction in progress, cancel it
-    id<MXKeyVerificationTransaction> transaction = [self transactionWithTransactionId:request.requestId];
+    MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:request.requestId];
     if (transaction)
     {
         [self cancelTransaction:transaction code:cancelCode success:success failure:failure];
@@ -722,13 +714,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 #pragma mark - Transactions
 
-- (MXHTTPOperation*)sendToOtherInTransaction:(id<MXKeyVerificationTransaction>)transaction
+- (MXHTTPOperation*)sendToOtherInTransaction:(MXKeyVerificationTransaction*)transaction
                                    eventType:(NSString*)eventType
                                      content:(NSDictionary*)content
                                      success:(void (^)(void))success
                                      failure:(void (^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] sendToOtherInTransaction%@: eventType: %@\n%@",
+    NSLog(@"[MXKeyVerification] sendToOtherInTransaction%@: eventType: %@\n%@",
           transaction.dmEventId ? @"(DM)" : @"",
           eventType, content);
 
@@ -746,12 +738,12 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     return operation;
 }
 
-- (void)cancelTransaction:(id<MXKeyVerificationTransaction>)transaction
+- (void)cancelTransaction:(MXKeyVerificationTransaction*)transaction
                      code:(MXTransactionCancelCode*)code
                   success:(void (^)(void))success
                   failure:(void (^)(NSError *error))failure
 {
-    MXLogDebug(@"[MXKeyVerification] cancelTransaction. code: %@", code.value);
+    NSLog(@"[MXKeyVerification] cancelTransaction. code: %@", code.value);
     
     MXKeyVerificationCancel *cancel = [MXKeyVerificationCancel new];
     cancel.transactionId = transaction.transactionId;
@@ -760,15 +752,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     
     [self sendToOtherInTransaction:transaction eventType:kMXEventTypeStringKeyVerificationCancel content:cancel.JSONDictionary success:^{
         
-        if ([transaction isKindOfClass:[MXLegacyKeyVerificationTransaction class]])
-        {
-            ((MXLegacyKeyVerificationTransaction *)transaction).reasonCancelCode = code;
-        }
-        else
-        {
-            NSString *message = [NSString stringWithFormat:@"[MXKeyVerification] cancelTransaction: Cannot set cancellation reason on unknown transaction type: %@", NSStringFromClass([transaction class])];
-            MXLogFailure(message)
-        }
+        transaction.reasonCancelCode = code;
         
         if (success)
         {
@@ -777,7 +761,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         
     } failure:^(NSError *error) {
         
-        MXLogDebug(@"[MXKeyVerification] cancelTransaction. Error: %@", error);
+        NSLog(@"[MXKeyVerification] cancelTransaction. Error: %@", error);
         if (failure)
         {
             failure(error);
@@ -790,7 +774,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 // Special handling for incoming requests that are not yet valid transactions
 - (void)cancelTransactionFromStartEvent:(MXEvent*)event code:(MXTransactionCancelCode*)code
 {
-    MXLogDebug(@"[MXKeyVerification] cancelTransactionFromStartEvent. code: %@", code.value);
+    NSLog(@"[MXKeyVerification] cancelTransactionFromStartEvent. code: %@", code.value);
 
     MXKeyVerificationStart *keyVerificationStart;
     MXJSONModelSetMXJSONModel(keyVerificationStart, MXKeyVerificationStart, event.content);
@@ -807,14 +791,14 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         {
             [self sendMessage:event.sender roomId:event.roomId eventType:kMXEventTypeStringKeyVerificationCancel relatedTo:keyVerificationStart.relatedEventId content:cancel.JSONDictionary success:nil failure:^(NSError *error) {
 
-                MXLogDebug(@"[MXKeyVerification] cancelTransactionFromStartEvent. Error: %@", error);
+                NSLog(@"[MXKeyVerification] cancelTransactionFromStartEvent. Error: %@", error);
             }];
         }
         else
         {
             [self sendToDevice:event.sender deviceId:keyVerificationStart.fromDevice eventType:kMXEventTypeStringKeyVerificationCancel content:cancel.JSONDictionary success:nil failure:^(NSError *error) {
 
-                MXLogDebug(@"[MXKeyVerification] cancelTransactionFromStartEvent. Error: %@", error);
+                NSLog(@"[MXKeyVerification] cancelTransactionFromStartEvent. Error: %@", error);
             }];
         }
 
@@ -832,7 +816,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         BOOL eventFromMyUser = [event.sender isEqualToString:self.crypto.mxSession.myUserId];
         BOOL isEventIntendedForMyDevice = isToDeviceEvent || !eventFromMyUser;
 
-        MXLogDebug(@"[MXKeyVerification] handleKeyVerificationEvent(from my user: %@, isToDeviceEvent: %@, intendedForMyDevice: %@): eventType: %@ \n%@",
+        NSLog(@"[MXKeyVerification] handleKeyVerificationEvent(from my user: %@, isToDeviceEvent: %@, intendedForMyDevice: %@): eventType: %@ \n%@",
               eventFromMyUser ? @"YES": @"NO",
               isToDeviceEvent ? @"YES": @"NO",
               isEventIntendedForMyDevice ? @"MAYBE": @"NO",     // MAYBE because it depends on the type of event
@@ -899,7 +883,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)handleToDeviceRequestEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleToDeviceRequestEvent");
+    NSLog(@"[MXKeyVerification] handleToDeviceRequestEvent");
     
     MXKeyVerificationByToDeviceRequest *keyVerificationRequest = [[MXKeyVerificationByToDeviceRequest alloc] initWithEvent:event andManager:self to:self.crypto.mxSession.myUserId requestedOtherDeviceIds:@[]];
     
@@ -908,17 +892,12 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         return;
     }
     
-    if (![self isRequestStillValid:keyVerificationRequest])
-    {
-        return;
-    }
-
     [self addPendingRequest:keyVerificationRequest notify:YES];
 }
 
 - (void)handleReadyEvent:(MXEvent*)event isToDeviceEvent:(BOOL)isToDeviceEvent
 {
-    MXLogDebug(@"[MXKeyVerification] handleReadyEvent");
+    NSLog(@"[MXKeyVerification] handleReadyEvent");
     
     MXKeyVerificationReady *keyVerificationReady;
     MXJSONModelSetMXJSONModel(keyVerificationReady, MXKeyVerificationReady, event.content);
@@ -929,7 +908,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
     
     NSString *requestId = keyVerificationReady.transactionId;
-    MXLegacyKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
+    MXKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
     
     if (request)
     {
@@ -949,7 +928,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             {
                 // This is a ready response to a request the user made from another device
                 // Remove it from pending requests will ignore any other events related to this request id
-                MXLogDebug(@"[MXKeyVerification] handleReadyEvent: The request (%@) has been accepted on another device. Ignore it.", requestId);
+                NSLog(@"[MXKeyVerification] handleReadyEvent: The request (%@) has been accepted on another device. Ignore it.", requestId);
                 [self removePendingRequestWithRequestId:request.requestId];
             }
         }
@@ -958,14 +937,14 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)handleCancelEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleCancelEvent");
+    NSLog(@"[MXKeyVerification] handleCancelEvent");
 
     MXKeyVerificationCancel *cancelContent;
     MXJSONModelSetMXJSONModel(cancelContent, MXKeyVerificationCancel, event.content);
 
     if (cancelContent)
     {
-        MXLegacyKeyVerificationTransaction *transaction = [self transactionWithTransactionId:cancelContent.transactionId];
+        MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:cancelContent.transactionId];
         if (transaction)
         {
             [transaction handleCancel:cancelContent];
@@ -973,7 +952,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         }
 
         NSString *requestId = cancelContent.transactionId;
-        MXLegacyKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
+        MXKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
         if (request)
         {
             [request handleCancel:cancelContent];
@@ -981,13 +960,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification] handleCancelEvent. Invalid event: %@", event.JSONDictionary);
+        NSLog(@"[MXKeyVerification] handleCancelEvent. Invalid event: %@", event.JSONDictionary);
     }
 }
 
 - (void)handleStartEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleStartEvent");
+    NSLog(@"[MXKeyVerification] handleStartEvent");
     
     MXSASKeyVerificationStart *keyVerificationSASStart;
     MXJSONModelSetMXJSONModel(keyVerificationSASStart, MXSASKeyVerificationStart, event.content);
@@ -1007,7 +986,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         return;
     }
     
-    MXLogDebug(@"[MXKeyVerification] handleStartEvent: Unknown start event %@", event);
+    NSLog(@"[MXKeyVerification] handleStartEvent: Unknown start event %@", event);
     [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.unknownMethod];
 }
 
@@ -1015,7 +994,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)handleSASKeyVerificationStart:(MXSASKeyVerificationStart*)keyVerificationStart withEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleSASKeyVerificationStart");
+    NSLog(@"[MXKeyVerification] handleSASKeyVerificationStart");
     
     if (!keyVerificationStart)
     {
@@ -1023,7 +1002,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
     
     NSString *requestId = keyVerificationStart.transactionId;
-    MXLegacyKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
+    MXKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
     if (request)
     {
         // We have a start response. The request is complete
@@ -1036,7 +1015,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             || (request.isFromMyUser && !request.isFromMyDevice))
         {
             // This is a start response to a request we did not make. Ignore it
-            MXLogDebug(@"[MXKeyVerification] handleStartEvent: Start event for verification by DM(%@) not triggered by this device. Ignore it", requestId);
+            NSLog(@"[MXKeyVerification] handleStartEvent: Start event for verification by DM(%@) not triggered by this device. Ignore it", requestId);
             return;
         }
     }
@@ -1055,11 +1034,11 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     // Make sure we have other device keys
     [self loadDeviceWithDeviceId:keyVerificationStart.fromDevice andUserId:event.sender success:^(MXDeviceInfo *otherDevice) {
         
-        id<MXKeyVerificationTransaction> existingTransaction = [self transactionWithUser:event.sender andDevice:keyVerificationStart.fromDevice];
+        MXKeyVerificationTransaction *existingTransaction = [self transactionWithUser:event.sender andDevice:keyVerificationStart.fromDevice];
         
-        if ([existingTransaction isKindOfClass:MXLegacyQRCodeTransaction.class])
+        if ([existingTransaction isKindOfClass:MXQRCodeTransaction.class])
         {
-            MXLegacyQRCodeTransaction *existingQRCodeTransaction = (MXLegacyQRCodeTransaction*)existingTransaction;
+            MXQRCodeTransaction *existingQRCodeTransaction = (MXQRCodeTransaction*)existingTransaction;
             
             if (existingQRCodeTransaction.state == MXQRCodeTransactionStateUnknown)
             {
@@ -1071,7 +1050,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
         if (existingTransaction)
         {
-            MXLogDebug(@"[MXKeyVerification] handleStartEvent: already existing transaction. Cancel both");
+            NSLog(@"[MXKeyVerification] handleStartEvent: already existing transaction. Cancel both");
             
             [existingTransaction cancelWithCancelCode:MXTransactionCancelCode.invalidMessage];
             [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.invalidMessage];
@@ -1079,10 +1058,10 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         }
         
         // Multiple keyshares between two devices: any two devices may only have at most one key verification in flight at a time.
-        NSArray<id<MXKeyVerificationTransaction>> *transactionsWithUser = [self transactionsWithUser:event.sender];
+        NSArray<MXKeyVerificationTransaction*> *transactionsWithUser = [self transactionsWithUser:event.sender];
         if (transactionsWithUser.count)
         {
-            MXLogDebug(@"[MXKeyVerification] handleStartEvent: already existing transaction with the user. Cancel both");
+            NSLog(@"[MXKeyVerification] handleStartEvent: already existing transaction with the user. Cancel both");
             
             [transactionsWithUser[0] cancelWithCancelCode:MXTransactionCancelCode.invalidMessage];
             [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.invalidMessage];
@@ -1098,100 +1077,100 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                 
                 if (request)
                 {
-                    MXLogDebug(@"[MXKeyVerification] handleStartEvent: auto accept incoming transaction in response of a request");
+                    NSLog(@"[MXKeyVerification] handleStartEvent: auto accept incoming transaction in response of a request");
                     [transaction accept];
                 }
             }
             else
             {
-                MXLogDebug(@"[MXKeyVerification] handleStartEvent: Expired transaction: %@", transaction);
+                NSLog(@"[MXKeyVerification] handleStartEvent: Expired transaction: %@", transaction);
                 [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.timeout];
             }
         }
         else
         {
-            MXLogDebug(@"[MXKeyVerification] handleStartEvent: Unsupported transaction method: %@", event);
+            NSLog(@"[MXKeyVerification] handleStartEvent: Unsupported transaction method: %@", event);
             [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.unknownMethod];
         }
         
     } failure:^(NSError *error) {
-        MXLogDebug(@"[MXKeyVerification] handleStartEvent: Failed to get other device keys: %@", event);
+        NSLog(@"[MXKeyVerification] handleStartEvent: Failed to get other device keys: %@", event);
         [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.invalidMessage];
     }];
 }
 
 - (void)handleAcceptEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleAcceptEvent");
+    NSLog(@"[MXKeyVerification] handleAcceptEvent");
 
     MXKeyVerificationAccept *acceptContent;
     MXJSONModelSetMXJSONModel(acceptContent, MXKeyVerificationAccept, event.content);
 
     if (acceptContent)
     {
-        MXLegacySASTransaction *transaction = [self sasTransactionWithTransactionId:acceptContent.transactionId];
+        MXSASTransaction *transaction = [self sasTransactionWithTransactionId:acceptContent.transactionId];
         if (transaction)
         {
             [transaction handleAccept:acceptContent];
         }
         else
         {
-            MXLogDebug(@"[MXKeyVerification] handleAcceptEvent. Unknown SAS transaction: %@", event);
+            NSLog(@"[MXKeyVerification] handleAcceptEvent. Unknown SAS transaction: %@", event);
         }
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification] handleAcceptEvent. Invalid event: %@", event);
+        NSLog(@"[MXKeyVerification] handleAcceptEvent. Invalid event: %@", event);
     }
 }
 
 - (void)handleKeyEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleKeyEvent");
+    NSLog(@"[MXKeyVerification] handleKeyEvent");
 
     MXKeyVerificationKey *keyContent;
     MXJSONModelSetMXJSONModel(keyContent, MXKeyVerificationKey, event.content);
 
     if (keyContent)
     {
-        MXLegacySASTransaction *transaction = [self sasTransactionWithTransactionId:keyContent.transactionId];
+        MXSASTransaction *transaction = [self sasTransactionWithTransactionId:keyContent.transactionId];
         if (transaction)
         {
             [transaction handleKey:keyContent];
         }
         else
         {
-            MXLogDebug(@"[MXKeyVerification] handleKeyEvent. Unknown SAS transaction: %@", event);
+            NSLog(@"[MXKeyVerification] handleKeyEvent. Unknown SAS transaction: %@", event);
         }
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification] handleKeyEvent. Invalid event: %@", event);
+        NSLog(@"[MXKeyVerification] handleKeyEvent. Invalid event: %@", event);
     }
 }
 
 - (void)handleMacEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleMacEvent");
+    NSLog(@"[MXKeyVerification] handleMacEvent");
 
     MXKeyVerificationMac *macContent;
     MXJSONModelSetMXJSONModel(macContent, MXKeyVerificationMac, event.content);
 
     if (macContent)
     {
-        MXLegacySASTransaction *transaction = [self sasTransactionWithTransactionId:macContent.transactionId];
+        MXSASTransaction *transaction = [self sasTransactionWithTransactionId:macContent.transactionId];
         if (transaction)
         {
             [transaction handleMac:macContent];
         }
         else
         {
-            MXLogDebug(@"[MXKeyVerification] handleMacEvent. Unknown SAS transaction: %@", event);
+            NSLog(@"[MXKeyVerification] handleMacEvent. Unknown SAS transaction: %@", event);
         }
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification] handleMacEvent. Invalid event: %@", event);
+        NSLog(@"[MXKeyVerification] handleMacEvent. Invalid event: %@", event);
     }
 }
 
@@ -1202,23 +1181,23 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     
     if (doneEvent)
     {
-        MXLegacyQRCodeTransaction *qrCodeTransaction = [self qrCodeTransactionWithTransactionId:doneEvent.transactionId];
+        MXQRCodeTransaction *qrCodeTransaction = [self qrCodeTransactionWithTransactionId:doneEvent.transactionId];
         if (qrCodeTransaction)
         {
             [qrCodeTransaction handleDone:doneEvent];
         }
         else
         {
-            MXLogDebug(@"[MXKeyVerification] handleDoneEvent. Not handled for SAS transaction: %@", event);
+            NSLog(@"[MXKeyVerification] handleDoneEvent. Not handled for SAS transaction: %@", event);
         }
         
-        id<MXKeyVerificationTransaction> transaction = [self transactionWithTransactionId:doneEvent.transactionId];
+        MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:doneEvent.transactionId];
         if (transaction && transaction.otherDeviceId)
         {
             BOOL eventFromMyDevice = [transaction.otherDeviceId isEqualToString:self.crypto.mxSession.myDeviceId];
             if (!eventFromMyDevice)
             {
-                MXLogDebug(@"[MXKeyVerification] handleDoneEvent: requestAllPrivateKeys");
+                NSLog(@"[MXKeyVerification] handleDoneEvent: requestAllPrivateKeys");
                 [self.crypto requestAllPrivateKeys];
             }
         }
@@ -1226,13 +1205,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         {
             // The done event from the other can happen long time after.
             // That means the transaction can be no more in memory. In this case, request private keys with no condition
-            MXLogDebug(@"[MXKeyVerification] handleDoneEvent: requestAllPrivateKeys anyway");
+            NSLog(@"[MXKeyVerification] handleDoneEvent: requestAllPrivateKeys anyway");
             [self.crypto requestAllPrivateKeys];
         }
     }
     else
     {
-        MXLogDebug(@"[MXKeyVerification] handleMacEvent. Invalid event: %@", event);
+        NSLog(@"[MXKeyVerification] handleMacEvent. Invalid event: %@", event);
     }
 }
 
@@ -1240,7 +1219,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)handleQRCodeKeyVerificationStart:(MXQRCodeKeyVerificationStart*)keyVerificationStart withEvent:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleQRCodeKeyVerificationStart");
+    NSLog(@"[MXKeyVerification] handleQRCodeKeyVerificationStart");
     
     if (!keyVerificationStart)
     {
@@ -1248,7 +1227,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
     
     NSString *requestId = keyVerificationStart.transactionId;
-    MXLegacyKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
+    MXKeyVerificationRequest *request = [self pendingRequestWithRequestId:requestId];
     if (request)
     {
         // We have a start response. The request is complete
@@ -1261,7 +1240,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             || (request.isFromMyUser && !request.isFromMyDevice))
         {
             // This is a start response to a request we did not make. Ignore it
-            MXLogDebug(@"[MXKeyVerification] handleStartEvent: Start event for verification by DM(%@) not triggered by this device. Ignore it", requestId);
+            NSLog(@"[MXKeyVerification] handleStartEvent: Start event for verification by DM(%@) not triggered by this device. Ignore it", requestId);
             return;
         }
     }
@@ -1272,12 +1251,12 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         return;
     }
     
-    MXLegacyQRCodeTransaction *qrCodeTransaction = [self qrCodeTransactionWithTransactionId:requestId];
+    MXQRCodeTransaction *qrCodeTransaction = [self qrCodeTransactionWithTransactionId:requestId];
     
     // Verify existing transaction
     if (!qrCodeTransaction)
     {
-        MXLogDebug(@"[MXKeyVerification] handleStartEvent: Start event for verification not triggered by this device no existing transaction. Start event: %@", event);
+        NSLog(@"[MXKeyVerification] handleStartEvent: Start event for verification not triggered by this device no existing transaction. Start event: %@", event);
         [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.userMismatchError];
         return;
     }
@@ -1285,7 +1264,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     // Verify sender user match
     if (![qrCodeTransaction.otherUserId isEqualToString:event.sender])
     {
-        MXLogDebug(@"[MXKeyVerification] handleStartEvent: Invalid start event sender user mismatch. Start event: %@.", event);
+        NSLog(@"[MXKeyVerification] handleStartEvent: Invalid start event sender user mismatch. Start event: %@.", event);
         [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.userMismatchError];
         return;
     }
@@ -1293,7 +1272,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     // Verify sender device match
     if (![qrCodeTransaction.otherDevice.deviceId isEqualToString:keyVerificationStart.fromDevice])
     {
-        MXLogDebug(@"[MXKeyVerification] handleStartEvent: Invalid start event sender device mismatch. Start event: %@.", event);
+        NSLog(@"[MXKeyVerification] handleStartEvent: Invalid start event sender device mismatch. Start event: %@.", event);
         [self cancelTransactionFromStartEvent:event code:MXTransactionCancelCode.userMismatchError];
         return;
     }
@@ -1345,11 +1324,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         [contentMap setObject:content forUser:userId andDevice:deviceId];
     }
     
-    MXToDevicePayload *payload = [[MXToDevicePayload alloc] initWithEventType:eventType
-                                                                   contentMap:contentMap
-                                                                transactionId:nil
-                                                                 addMessageId:NO]; // // Should not add anything for verification events as it would break their signatures
-    return [self.crypto.matrixRestClient sendToDevice:payload success:success failure:failure];
+    return [self.crypto.matrixRestClient sendToDevice:eventType contentMap:contentMap txnId:nil success:success failure:failure];
 }
 
 
@@ -1380,10 +1355,10 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 {
     NSMutableDictionary *eventContent = [content mutableCopy];
 
-    eventContent[kMXEventRelationRelatesToKey] = @{
-        kMXEventContentRelatesToKeyRelationType: MXEventRelationTypeReference,
-        kMXEventContentRelatesToKeyEventId: relatedTo,
-    };
+    eventContent[@"m.relates_to"] = @{
+                                      @"rel_type": MXEventRelationTypeReference,
+                                      @"event_id": relatedTo,
+                                      };
 
     [eventContent removeObjectForKey:@"transaction_id"];
 
@@ -1403,7 +1378,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
     [_crypto.mxSession listenToEventsOfTypes:types onEvent:^(MXEvent *event, MXTimelineDirection direction, id customObject) {
         if (direction == MXTimelineDirectionForwards
-            && [event.content[kMXMessageTypeKey] isEqualToString:kMXMessageTypeKeyVerificationRequest])
+            && [event.content[@"msgtype"] isEqualToString:kMXMessageTypeKeyVerificationRequest])
         {
             MXKeyVerificationByDMRequest *requestByDM = [[MXKeyVerificationByDMRequest alloc] initWithEvent:event andManager:self];
             if (requestByDM)
@@ -1417,11 +1392,11 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)handleKeyVerificationRequestByDM:(MXKeyVerificationByDMRequest*)request event:(MXEvent*)event
 {
-    MXLogDebug(@"[MXKeyVerification] handleKeyVerificationRequestByDM: %@", request);
+    NSLog(@"[MXKeyVerification] handleKeyVerificationRequestByDM: %@", request);
 
     if (![request.request.to isEqualToString:self.crypto.mxSession.myUserId])
     {
-        MXLogDebug(@"[MXKeyVerification] handleKeyVerificationRequestByDM: Request for another user: %@", request.request.to);
+        NSLog(@"[MXKeyVerification] handleKeyVerificationRequestByDM: Request for another user: %@", request.request.to);
         return;
     }
 
@@ -1438,7 +1413,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             }
 
         } failure:^(NSError *error) {
-            MXLogDebug(@"[MXKeyVerificationRequest] handleKeyVerificationRequestByDM: Failed to resolve state: %@", request.requestId);
+            NSLog(@"[MXKeyVerificationRequest] handleKeyVerificationRequestByDM: Failed to resolve state: %@", request.requestId);
         }];
     });
 }
@@ -1504,7 +1479,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     }
 
     MXHTTPOperation *operation = [MXHTTPOperation new];
-    operation = [room sendEventOfType:eventType content:content threadId:nil localEcho:nil success:success failure:^(NSError *error) {
+    operation = [room sendEventOfType:eventType content:content localEcho:nil success:success failure:^(NSError *error) {
 
         if ([error.domain isEqualToString:MXEncryptingErrorDomain] &&
             error.code == MXEncryptingErrorUnknownDeviceCode)
@@ -1513,7 +1488,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
             MXUsersDevicesMap<MXDeviceInfo *> *unknownDevices = error.userInfo[MXEncryptingErrorUnknownDeviceDevicesKey];
             [self.crypto setDevicesKnown:unknownDevices complete:^{
                 // And retry
-                MXHTTPOperation *operation2 = [room sendEventOfType:eventType content:content threadId:nil localEcho:nil success:success failure:failure];
+                MXHTTPOperation *operation2 = [room sendEventOfType:eventType content:content localEcho:nil success:success failure:failure];
                 [operation mutateTo:operation2];
             }];
         }
@@ -1530,11 +1505,11 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                                      andSupportedMethods:(NSArray<NSString*>*)supportedMethods
                                               completion:(void (^)(NSArray<NSString*>* readyMethods, MXQRCodeData *qrCodeData))completion;
 {
-    MXLegacyKeyVerificationRequest *keyVerificationRequest = [self pendingRequestWithRequestId:transactionId];
+    MXKeyVerificationRequest *keyVerificationRequest = [self pendingRequestWithRequestId:transactionId];
     
     if (!keyVerificationRequest)
     {
-        MXLogDebug(@"[MXKeyVerification] computeReadyMethodsFromVerificationRequestWithId: Failed to find request with ID: %@", transactionId);
+        NSLog(@"[MXKeyVerification] computeReadyMethodsFromVerificationRequestWithId: Failed to find request with ID: %@", transactionId);
     }
     
     NSMutableSet<NSString*> *readyMethods = [NSMutableSet new];
@@ -1585,7 +1560,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 {
     BOOL isOtherQRCodeDataValid = YES;
     
-    id<MXCrossSigning> crossSigning = self.crypto.crossSigning;
+    MXCrossSigning *crossSigning = self.crypto.crossSigning;
     
     NSString *masterKeyPublic = crossSigning.myUserCrossSigningKeys.masterKeys.keys;
     
@@ -1593,19 +1568,19 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     {
         MXVerifyingAnotherUserQRCodeData *verifyingAnotherUserQRCodeData = (MXVerifyingAnotherUserQRCodeData*)otherQRCodeData;
         
-        MXCrossSigningInfo *otherUserCrossSigningKeys = [self.crypto.crossSigning crossSigningKeysForUser:otherUserId];
+        MXCrossSigningInfo *otherUserCrossSigningKeys = [self.crypto crossSigningKeysForUser:otherUserId];
         NSString *otherUserMasterKeyPublic = otherUserCrossSigningKeys.masterKeys.keys;
     
         // verifyingAnotherUserQRCodeData.otherUserCrossSigningMasterKeyPublic -> Current user master key public
         if (![verifyingAnotherUserQRCodeData.otherUserCrossSigningMasterKeyPublic isEqualToString:masterKeyPublic])
         {
-            MXLogDebug(@"[MXKeyVerification] checkOtherQRCodeData: Invalid other master key %@", verifyingAnotherUserQRCodeData.otherUserCrossSigningMasterKeyPublic);
+            NSLog(@"[MXKeyVerification] checkOtherQRCodeData: Invalid other master key %@", verifyingAnotherUserQRCodeData.otherUserCrossSigningMasterKeyPublic);
             isOtherQRCodeDataValid = NO;
         }
         // verifyingAnotherUserQRCodeData.userCrossSigningMasterKeyPublic -> Other user master key public
         else if (![verifyingAnotherUserQRCodeData.userCrossSigningMasterKeyPublic isEqualToString:otherUserMasterKeyPublic])
         {
-            MXLogDebug(@"[MXKeyVerification] checkOtherQRCodeData: Invalid user master key %@", verifyingAnotherUserQRCodeData.userCrossSigningMasterKeyPublic);
+            NSLog(@"[MXKeyVerification] checkOtherQRCodeData: Invalid user master key %@", verifyingAnotherUserQRCodeData.userCrossSigningMasterKeyPublic);
             isOtherQRCodeDataValid = NO;
         }
     }
@@ -1618,13 +1593,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         // selfVerifyingMasterKeyTrustedQRCodeData.userCrossSigningMasterKeyPublic -> Current user master key public
         if (![selfVerifyingMasterKeyTrustedQRCodeData.userCrossSigningMasterKeyPublic isEqualToString:masterKeyPublic])
         {
-            MXLogDebug(@"[MXKeyVerification] checkOtherQRCodeData: Invalid user master key %@", selfVerifyingMasterKeyTrustedQRCodeData.userCrossSigningMasterKeyPublic);
+            NSLog(@"[MXKeyVerification] checkOtherQRCodeData: Invalid user master key %@", selfVerifyingMasterKeyTrustedQRCodeData.userCrossSigningMasterKeyPublic);
             isOtherQRCodeDataValid = NO;
         }
         // selfVerifyingMasterKeyTrustedQRCodeData.otherDeviceKey -> Current device key
         else if (![selfVerifyingMasterKeyTrustedQRCodeData.otherDeviceKey isEqualToString:currentDeviceKey])
         {
-            MXLogDebug(@"[MXKeyVerification] checkOtherQRCodeData: Invalid other device key %@", selfVerifyingMasterKeyTrustedQRCodeData.otherDeviceKey);
+            NSLog(@"[MXKeyVerification] checkOtherQRCodeData: Invalid other device key %@", selfVerifyingMasterKeyTrustedQRCodeData.otherDeviceKey);
             isOtherQRCodeDataValid = NO;
         }
     }
@@ -1636,13 +1611,13 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         // selfVerifyingMasterKeyNotTrustedQRCodeData.currentDeviceKey -> other device key
         if (![selfVerifyingMasterKeyNotTrustedQRCodeData.currentDeviceKey isEqualToString:otherDeviceKey])
         {
-            MXLogDebug(@"[MXKeyVerification] checkOtherQRCodeData: Current device key %@", selfVerifyingMasterKeyNotTrustedQRCodeData.currentDeviceKey);
+            NSLog(@"[MXKeyVerification] checkOtherQRCodeData: Current device key %@", selfVerifyingMasterKeyNotTrustedQRCodeData.currentDeviceKey);
             isOtherQRCodeDataValid = NO;
         }
         // selfVerifyingMasterKeyNotTrustedQRCodeData.userCrossSigningMasterKeyPublic -> Current user master key public
         else if (![selfVerifyingMasterKeyNotTrustedQRCodeData.userCrossSigningMasterKeyPublic isEqualToString:masterKeyPublic])
         {
-            MXLogDebug(@"[MXKeyVerification] checkOtherQRCodeData: Invalid user master key %@", selfVerifyingMasterKeyNotTrustedQRCodeData.userCrossSigningMasterKeyPublic);
+            NSLog(@"[MXKeyVerification] checkOtherQRCodeData: Invalid user master key %@", selfVerifyingMasterKeyNotTrustedQRCodeData.userCrossSigningMasterKeyPublic);
             isOtherQRCodeDataValid = NO;
         }
     }
@@ -1655,19 +1630,19 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 - (nullable MXKeyVerificationByDMRequest*)verificationRequestInDMEvent:(MXEvent*)event
 {
     MXKeyVerificationByDMRequest *request;
-    if ([event.content[kMXMessageTypeKey] isEqualToString:kMXMessageTypeKeyVerificationRequest])
+    if ([event.content[@"msgtype"] isEqualToString:kMXMessageTypeKeyVerificationRequest])
     {
         request = [[MXKeyVerificationByDMRequest alloc] initWithEvent:event andManager:self];
     }
     return request;
 }
 
-- (nullable MXLegacyKeyVerificationRequest*)pendingRequestWithRequestId:(NSString*)requestId
+- (nullable MXKeyVerificationRequest*)pendingRequestWithRequestId:(NSString*)requestId
 {
     return pendingRequestsMap[requestId];
 }
 
-- (void)addPendingRequest:(id<MXKeyVerificationRequest>)request notify:(BOOL)notify
+- (void)addPendingRequest:(MXKeyVerificationRequest *)request notify:(BOOL)notify
 {
     if (!pendingRequestsMap[request.requestId])
     {
@@ -1701,7 +1676,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 - (nullable NSDate*)oldestRequestDate
 {
     NSDate *oldestRequestDate;
-    for (MXLegacyKeyVerificationRequest *request in pendingRequestsMap.allValues)
+    for (MXKeyVerificationRequest *request in pendingRequestsMap.allValues)
     {
         if (!oldestRequestDate
             || request.timestamp < oldestRequestDate.timeIntervalSince1970)
@@ -1712,7 +1687,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     return oldestRequestDate;
 }
 
-- (BOOL)isRequestStillValid:(MXLegacyKeyVerificationRequest *)request
+- (BOOL)isRequestStillValid:(MXKeyVerificationRequest*)request
 {
     NSDate *requestDate = [NSDate dateWithTimeIntervalSince1970:(request.timestamp / 1000)];
     return (requestDate.timeIntervalSinceNow > -_requestTimeout);
@@ -1724,7 +1699,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     {
         if (!pendingRequestsMap.count)
         {
-            MXLogDebug(@"[MXKeyVerificationRequest] scheduleTimeoutTimer: Disable timer as there is no more requests");
+            NSLog(@"[MXKeyVerificationRequest] scheduleTimeoutTimer: Disable timer as there is no more requests");
             [requestTimeoutTimer invalidate];
             requestTimeoutTimer = nil;
         }
@@ -1735,8 +1710,9 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     NSDate *oldestRequestDate = [self oldestRequestDate];
     if (oldestRequestDate)
     {
+        NSLog(@"[MXKeyVerificationRequest] scheduleTimeoutTimer: Create timer");
+
         NSDate *timeoutDate = [oldestRequestDate dateByAddingTimeInterval:self.requestTimeout];
-        MXLogDebug(@"[MXKeyVerificationRequest] scheduleTimeoutTimer: Create timer");
         requestTimeoutTimer = [[NSTimer alloc] initWithFireDate:timeoutDate
                                                       interval:0
                                                         target:self
@@ -1749,7 +1725,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)onRequestTimeoutTimer
 {
-    MXLogDebug(@"[MXKeyVerificationRequest] onTimeoutTimer");
+    NSLog(@"[MXKeyVerificationRequest] onTimeoutTimer");
     requestTimeoutTimer = nil;
 
     [self checkRequestTimeoutsWithCompletion:^{
@@ -1760,11 +1736,11 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 - (void)checkRequestTimeoutsWithCompletion:(dispatch_block_t)completionBlock
 {
     dispatch_group_t group = dispatch_group_create();
-    for (MXLegacyKeyVerificationRequest *request in pendingRequestsMap.allValues)
+    for (MXKeyVerificationRequest *request in pendingRequestsMap.allValues)
     {
         if (![self isRequestStillValid:request])
         {
-            MXLogDebug(@"[MXKeyVerificationRequest] checkTimeouts: timeout %@", request);
+            NSLog(@"[MXKeyVerificationRequest] checkTimeouts: timeout %@", request);
             
             dispatch_group_enter(group);
             [request cancelWithCancelCode:MXTransactionCancelCode.timeout success:^{
@@ -1781,20 +1757,20 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 #pragma mark - Transactions queue
 
-- (id<MXKeyVerificationTransaction>)transactionWithUser:(NSString*)userId andDevice:(NSString*)deviceId
+- (MXKeyVerificationTransaction*)transactionWithUser:(NSString*)userId andDevice:(NSString*)deviceId
 {
     return [transactions objectForDevice:deviceId forUser:userId];
 }
 
-- (NSArray<id<MXKeyVerificationTransaction>>*)transactionsWithUser:(NSString*)userId
+- (NSArray<MXKeyVerificationTransaction*>*)transactionsWithUser:(NSString*)userId
 {
     return [transactions objectsForUser:userId];
 }
 
-- (MXLegacyKeyVerificationTransaction *)transactionWithTransactionId:(NSString*)transactionId
+- (MXKeyVerificationTransaction*)transactionWithTransactionId:(NSString*)transactionId
 {
-    MXLegacyKeyVerificationTransaction *transaction;
-    for (MXLegacyKeyVerificationTransaction *t in transactions.allObjects)
+    MXKeyVerificationTransaction *transaction;
+    for (MXKeyVerificationTransaction *t in transactions.allObjects)
     {
         if ([t.transactionId isEqualToString:transactionId])
         {
@@ -1806,35 +1782,35 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     return transaction;
 }
 
-- (MXLegacySASTransaction *)sasTransactionWithTransactionId:(NSString*)transactionId
+- (MXSASTransaction*)sasTransactionWithTransactionId:(NSString*)transactionId
 {
-    MXLegacySASTransaction *sasTransaction;
+    MXSASTransaction *sasTransaction;
     
-    MXLegacyKeyVerificationTransaction *transaction = [self transactionWithTransactionId:transactionId];
+    MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:transactionId];
     
-    if ([transaction isKindOfClass:[MXLegacySASTransaction class]])
+    if ([transaction isKindOfClass:MXSASTransaction.class])
     {
-        sasTransaction = (MXLegacySASTransaction *)transaction;
+        sasTransaction = (MXSASTransaction *)transaction;
     }
     
     return sasTransaction;
 }
 
-- (id<MXQRCodeTransaction>)qrCodeTransactionWithTransactionId:(NSString*)transactionId
+- (MXQRCodeTransaction*)qrCodeTransactionWithTransactionId:(NSString*)transactionId
 {
-    MXLegacyQRCodeTransaction *qrCodeTransaction;
+    MXQRCodeTransaction *qrCodeTransaction;
     
-    id<MXKeyVerificationTransaction> transaction = [self transactionWithTransactionId:transactionId];
+    MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:transactionId];
     
-    if ([transaction isKindOfClass:MXLegacyQRCodeTransaction.class])
+    if ([transaction isKindOfClass:MXQRCodeTransaction.class])
     {
-        qrCodeTransaction = (MXLegacyQRCodeTransaction *)transaction;
+        qrCodeTransaction = (MXQRCodeTransaction *)transaction;
     }
     
     return qrCodeTransaction;
 }
 
-- (void)addTransaction:(id<MXKeyVerificationTransaction>)transaction
+- (void)addTransaction:(MXKeyVerificationTransaction*)transaction
 {
     [transactions setObject:transaction forUser:transaction.otherUserId andDevice:transaction.otherDeviceId];
     [self scheduleTransactionTimeoutTimer];
@@ -1849,7 +1825,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)removeTransactionWithTransactionId:(NSString*)transactionId
 {
-    id<MXKeyVerificationTransaction> transaction = [self transactionWithTransactionId:transactionId];
+    MXKeyVerificationTransaction *transaction = [self transactionWithTransactionId:transactionId];
     if (transaction)
     {
         [transactions removeObjectForUser:transaction.otherUserId andDevice:transaction.otherDeviceId];
@@ -1860,7 +1836,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 - (nullable NSDate*)oldestTransactionCreationDate
 {
     NSDate *oldestCreationDate;
-    for (MXLegacyKeyVerificationTransaction *transaction in transactions.allObjects)
+    for (MXKeyVerificationTransaction *transaction in transactions.allObjects)
     {
         if (!oldestCreationDate
             || transaction.creationDate.timeIntervalSince1970 < oldestCreationDate.timeIntervalSince1970)
@@ -1871,7 +1847,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     return oldestCreationDate;
 }
 
-- (BOOL)isCreationDateValid:(MXLegacyKeyVerificationTransaction *)transaction
+- (BOOL)isCreationDateValid:(MXKeyVerificationTransaction*)transaction
 {
     return (transaction.creationDate.timeIntervalSinceNow > -MXTransactionTimeout);
 }
@@ -1885,7 +1861,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     {
         if (!transactions.count)
         {
-            MXLogDebug(@"[MXKeyVerification] scheduleTimeoutTimer: Disable timer as there is no more transactions");
+            NSLog(@"[MXKeyVerification] scheduleTimeoutTimer: Disable timer as there is no more transactions");
             [transactionTimeoutTimer invalidate];
             transactionTimeoutTimer = nil;
         }
@@ -1905,7 +1881,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                 return;
             }
 
-            MXLogDebug(@"[MXKeyVerification] scheduleTimeoutTimer: Create timer");
+            NSLog(@"[MXKeyVerification] scheduleTimeoutTimer: Create timer");
 
             NSDate *timeoutDate = [oldestCreationDate dateByAddingTimeInterval:MXTransactionTimeout];
             self->transactionTimeoutTimer = [[NSTimer alloc] initWithFireDate:timeoutDate
@@ -1921,7 +1897,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)onTransactionTimeoutTimer
 {
-    MXLogDebug(@"[MXKeyVerification] onTimeoutTimer");
+    NSLog(@"[MXKeyVerification] onTimeoutTimer");
     self->transactionTimeoutTimer = nil;
 
     if (cryptoQueue)
@@ -1935,11 +1911,11 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
 - (void)checkTransactionTimeouts
 {
-    for (MXLegacyKeyVerificationTransaction *transaction in transactions.allObjects)
+    for (MXKeyVerificationTransaction *transaction in transactions.allObjects)
     {
         if (![self isCreationDateValid:transaction])
         {
-            MXLogDebug(@"[MXKeyVerification] checkTimeouts: timeout %@", transaction);
+            NSLog(@"[MXKeyVerification] checkTimeouts: timeout %@", transaction);
             [transaction cancelWithCancelCode:MXTransactionCancelCode.timeout];
         }
     }
@@ -1959,7 +1935,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
         if (currentUserTrustLevel.isCrossSigningVerified)
         {
             // This is a self verification and I am the old device (Osborne2)
-            qrCodeData = [self createSelfVerifyingMasterKeyTrustedQRCodeDataWithTransactionId:transactionId otherDeviceId:otherDeviceId];
+            qrCodeData = [self createSelfVerifyingMasterKeyTrustedQRCodeDataWithTransactionId:transactionId otherDeviceId:otherUserId];
         }
         else
         {
@@ -1979,14 +1955,14 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
                                                                                otherUserId:(NSString*)otherUserId
 {
     MXCrossSigningInfo *myUserCrossSigningKeys = self.crypto.crossSigning.myUserCrossSigningKeys;
-    MXCrossSigningInfo *otherUserCrossSigningKeys = [self.crypto.crossSigning crossSigningKeysForUser:otherUserId];
+    MXCrossSigningInfo *otherUserCrossSigningKeys = [self.crypto crossSigningKeysForUser:otherUserId];
 
     NSString *userCrossSigningMasterKeyPublic = myUserCrossSigningKeys.masterKeys.keys;
     NSString *otherUserCrossSigningMasterKeyPublic = otherUserCrossSigningKeys.masterKeys.keys;
 
     if (!userCrossSigningMasterKeyPublic || !otherUserCrossSigningMasterKeyPublic)
     {
-        MXLogDebug(@"[MXKeyVerification] createVerifyingAnotherUserQRCodeData fails to get userCrossSigningMasterKeyPublic or otherUserCrossSigningMasterKeyPublic");
+        NSLog(@"[MXKeyVerification] createVerifyingAnotherUserQRCodeData fails to get userCrossSigningMasterKeyPublic or otherUserCrossSigningMasterKeyPublic");
         return nil;
     }
 
@@ -2008,7 +1984,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
     
     if (!userCrossSigningMasterKeyPublic || !otherDeviceKey)
     {
-        MXLogDebug(@"[MXKeyVerification] createSelfVerifyingMasterKeyTrustedQRCodeData fails to get userCrossSigningMasterKeyPublic or otherDeviceKey");
+        NSLog(@"[MXKeyVerification] createSelfVerifyingMasterKeyTrustedQRCodeData fails to get userCrossSigningMasterKeyPublic or otherDeviceKey");
         return nil;
     }
     
@@ -2027,7 +2003,7 @@ static NSArray<MXEventTypeString> *kMXKeyVerificationManagerVerificationEventTyp
 
     if (!userCrossSigningMasterKeyPublic || !currentDeviceKey)
     {
-        MXLogDebug(@"[MXKeyVerification] createSelfVerifyingMasterKeyNotTrustedQRCodeData fails to get userCrossSigningMasterKeyPublic or currentDeviceKey");
+        NSLog(@"[MXKeyVerification] createSelfVerifyingMasterKeyNotTrustedQRCodeData fails to get userCrossSigningMasterKeyPublic or currentDeviceKey");
         return nil;
     }
 

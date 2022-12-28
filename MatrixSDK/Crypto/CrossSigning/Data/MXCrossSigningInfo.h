@@ -19,7 +19,6 @@
 #import "MXCrossSigningKey.h"
 #import "MXUserTrustLevel.h"
 
-@class MXCryptoUserIdentityWrapper;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -32,13 +31,6 @@ extern NSString *const MXCrossSigningInfoTrustLevelDidChangeNotification;
  `MXCrossSigningInfo` gathers information about a user's cross-signing keys.
  */
 @interface MXCrossSigningInfo : NSObject <NSCoding>
-
-#if DEBUG
-/**
- Initialize cross signing with MatrixSDKCrypto user identity
- */
-- (instancetype)initWithUserIdentity:(MXCryptoUserIdentityWrapper *)userIdentity;
-#endif
 
 /**
  The user's id.

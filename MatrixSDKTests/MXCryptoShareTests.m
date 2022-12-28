@@ -21,8 +21,6 @@
 
 #import "MXCrypto_Private.h"
 #import "MXCryptoStore.h"
-#import "MXMemoryStore.h"
-#import "MatrixSDKTestsSwiftHeader.h"
 
 #import <OHHTTPStubs/HTTPStubs.h>
 
@@ -60,10 +58,10 @@
 // Import megolm session data as if they come from a response to a key share request
 - (void)mimicKeyShareResponseForSession:(MXSession*)session withSessionData:(MXMegolmSessionData*)sessionData complete:(void (^)(void))complete
 {
-    [session.legacyCrypto importMegolmSessionDatas:@[sessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
+    [session.crypto importMegolmSessionDatas:@[sessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
         complete();
     } failure:^(NSError *error) {
-        [matrixSDKTestsData breakTestCase:self reason:@"Cannot set up intial test conditions - error: %@", error];
+        NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
     }];
 }
 
@@ -85,23 +83,23 @@
 
         // - Bob sends messages
         MXRoom *roomFromBobPOV = [bobSession roomWithRoomId:roomId];
-        [roomFromBobPOV sendTextMessage:messages[0] threadId:nil success:^(NSString *eventId) {
-            [roomFromBobPOV sendTextMessage:messages[1] threadId:nil success:^(NSString *eventId) {
-                [roomFromBobPOV sendTextMessage:messages[2] threadId:nil success:^(NSString *eventId) {
-                    [roomFromBobPOV sendTextMessage:messages[3] threadId:nil success:^(NSString *eventId) {
-                        [roomFromBobPOV sendTextMessage:messages[4] threadId:nil success:nil failure:nil];
+        [roomFromBobPOV sendTextMessage:messages[0] success:^(NSString *eventId) {
+            [roomFromBobPOV sendTextMessage:messages[1] success:^(NSString *eventId) {
+                [roomFromBobPOV sendTextMessage:messages[2] success:^(NSString *eventId) {
+                    [roomFromBobPOV sendTextMessage:messages[3] success:^(NSString *eventId) {
+                        [roomFromBobPOV sendTextMessage:messages[4] success:nil failure:nil];
                     } failure:nil];
                 } failure:nil];
             } failure:nil];
         } failure:^(NSError *error) {
-            [matrixSDKTestsData breakTestCase:self reason:@"Cannot set up intial test conditions - error: %@", error];
+            NSAssert(NO, @"Cannot set up intial test conditions - error: %@", error);
         }];
 
 
         // - Alice gets them decrypted
         MXRoom *roomFromAlicePOV = [aliceSession roomWithRoomId:roomId];
         __block NSUInteger messagesCount = 0;
-        [roomFromAlicePOV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+        [roomFromAlicePOV liveTimeline:^(MXEventTimeline *liveTimeline) {
             [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
                 if (++messagesCount == messages.count)
@@ -110,7 +108,7 @@
                     MXJSONModelSetString(sessionId, event.wireContent[@"session_id"]);
                     MXJSONModelSetString(senderKey, event.wireContent[@"sender_key"]);
 
-                    MXOlmInboundGroupSession *session = [aliceSession.legacyCrypto.store inboundGroupSessionWithId:sessionId andSenderKey:senderKey];
+                    MXOlmInboundGroupSession *session = [aliceSession.crypto.store inboundGroupSessionWithId:sessionId andSenderKey:senderKey];
                     XCTAssert(session);
 
                     // - Export partial and full megolm session data
@@ -121,7 +119,7 @@
 
                     // - Log Alice on a new device
                     [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-                    [matrixSDKTestsData relogUserSessionWithNewDevice:self session:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+                    [matrixSDKTestsData relogUserSessionWithNewDevice:aliceSession withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
                         [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = NO;
 
                         readyToTest(aliceSession2, roomId, sessionData, partialSessionData, expectation);
@@ -142,33 +140,32 @@
  -> Key share requests must be pending
  -> Then, they must have been sent
  */
-// TODO: Test currently broken
-- (void)xtestKeyShareRequestFromNewDevice
+- (void)testKeyShareRequestFromNewDevice
 {
     //  - Have Alice and Bob in e2ee room with messages
     [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoomWithCryptedMessages:self cryptedBob:YES readyToTest:^(MXSession *aliceSession1, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
         
         //- Alice signs in on a new device
-        [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+        [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
             
             // - Alice2 paginates in the room
             MXRoom *roomFromAlice2POV = [aliceSession2 roomWithRoomId:roomId];
-            [roomFromAlice2POV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [roomFromAlice2POV liveTimeline:^(MXEventTimeline *liveTimeline) {
                 [liveTimeline resetPagination];
                 [liveTimeline paginate:10 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
                     
                     // - Key share requests must be pending
-                    XCTAssertNotNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
+                    XCTAssertNotNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
                     
                     // Wait a bit
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                         
                         // -> Then, they must have been sent
-                        XCTAssertNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
-                        XCTAssertNotNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent]);
+                        XCTAssertNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
+                        XCTAssertNotNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent]);
                         
                         // -> Alice2 should have received no keys
-                        XCTAssertEqual(aliceSession2.legacyCrypto.store.inboundGroupSessions.count, 0);
+                        XCTAssertEqual(aliceSession2.crypto.store.inboundGroupSessions.count, 0);
                         [expectation fulfill];
                     });
                     
@@ -194,14 +191,13 @@
 -> After a bit, Alice2 should have received all keys
  -> Key share requests should have complete
  */
-// TODO: test is currently broken
-- (void)xtestNominalCase
+- (void)testNominalCase
 {
     //  - Have Alice and Bob in e2ee room with messages
     [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoomWithCryptedMessages:self cryptedBob:YES readyToTest:^(MXSession *aliceSession1, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
         
         //- Alice signs in on a new device
-        [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+        [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
             
             NSString *aliceUserId = aliceSession1.matrixRestClient.credentials.userId;
             
@@ -215,27 +211,22 @@
                     
                     // - Alice2 pagingates in the room
                     MXRoom *roomFromAlice2POV = [aliceSession2 roomWithRoomId:roomId];
-                    if (!roomFromAlice2POV) {
-                        XCTFail(@"Failed to fetch room");
-                        [expectation fulfill];
-                    }
-                    
-                    [roomFromAlice2POV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                    [roomFromAlice2POV liveTimeline:^(MXEventTimeline *liveTimeline) {
                         [liveTimeline resetPagination];
                         [liveTimeline paginate:10 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
                             
                             // -> Key share requests must be pending
-                            XCTAssertNotNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
+                            XCTAssertNotNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
                             
                             // Wait a bit
-                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                                 
                                 // -> After a bit, Alice2 should have received all keys
-                                XCTAssertEqual(aliceSession2.legacyCrypto.store.inboundGroupSessions.count, aliceSession1.legacyCrypto.store.inboundGroupSessions.count);
+                                XCTAssertEqual(aliceSession2.crypto.store.inboundGroupSessions.count, aliceSession1.crypto.store.inboundGroupSessions.count);
                                 
                                 // -> Key share requests should have complete
-                                XCTAssertNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
-                                XCTAssertNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent]);
+                                XCTAssertNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
+                                XCTAssertNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent]);
                                 
                                 [expectation fulfill];
                             });
@@ -271,18 +262,17 @@
  - Enable key share requests on Alice2
  -> Key share requests should have complete
  */
-// TODO: test currently broken
-- (void)xtestDisableKeyShareRequest
+- (void)testDisableKeyShareRequest
 {
     //  - Have Alice and Bob in e2ee room with messages
     [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoomWithCryptedMessages:self cryptedBob:YES readyToTest:^(MXSession *aliceSession1, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
         
         //- Alice signs in on a new device
-        [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+        [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
             
             // - Disable key share requests on Alice2
-            [aliceSession2.legacyCrypto setOutgoingKeyRequestsEnabled:NO onComplete:nil];
-            aliceSession2.legacyCrypto.enableOutgoingKeyRequestsOnceSelfVerificationDone = NO;
+            [aliceSession2.crypto setOutgoingKeyRequestsEnabled:NO onComplete:nil];
+            aliceSession2.crypto.enableOutgoingKeyRequestsOnceSelfVerificationDone = NO;
             
             NSString *aliceUserId = aliceSession1.matrixRestClient.credentials.userId;
             
@@ -296,25 +286,25 @@
                     
                     // - Alice2 pagingates in the room
                     MXRoom *roomFromAlice2POV = [aliceSession2 roomWithRoomId:roomId];
-                    [roomFromAlice2POV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                    [roomFromAlice2POV liveTimeline:^(MXEventTimeline *liveTimeline) {
                         [liveTimeline resetPagination];
                         [liveTimeline paginate:10 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
                             
                             // Wait a bit
-                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                                 
                                 // -> Key share requests must be pending
-                                XCTAssertNotNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
+                                XCTAssertNotNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
                                 
                                 // - Enable key share requests on Alice2
-                                [aliceSession2.legacyCrypto setOutgoingKeyRequestsEnabled:YES onComplete:^{
+                                [aliceSession2.crypto setOutgoingKeyRequestsEnabled:YES onComplete:^{
                                     
                                     // Wait a bit
                                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                                         
                                         // -> Key share requests should have complete
-                                        XCTAssertNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
-                                        XCTAssertNil([aliceSession2.legacyCrypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent]);
+                                        XCTAssertNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateUnsent]);
+                                        XCTAssertNil([aliceSession2.crypto.store outgoingRoomKeyRequestWithState:MXRoomKeyRequestStateSent]);
                                         [expectation fulfill];
                                         
                                     });
@@ -354,28 +344,27 @@
  -> key share requests on Alice2 are enabled again
  -> No m.room_key_request have been made
  */
-// TODO: Test currently broken
-- (void)xtestNoKeyShareRequestIfThereIsABackup
+- (void)testNoKeyShareRequestIfThereIsABackup
 {
     //  - Have Alice and Bob in e2ee room with messages
     [matrixSDKTestsE2EData doE2ETestWithAliceAndBobInARoomWithCryptedMessages:self cryptedBob:YES readyToTest:^(MXSession *aliceSession1, MXSession *bobSession, NSString *roomId, XCTestExpectation *expectation) {
         
         // - Alice set up a backup
-        [aliceSession1.crypto.backup prepareKeyBackupVersionWithPassword:nil algorithm:nil success:^(MXMegolmBackupCreationInfo * _Nonnull keyBackupCreationInfo) {
+        [aliceSession1.crypto.backup prepareKeyBackupVersionWithPassword:nil success:^(MXMegolmBackupCreationInfo * _Nonnull keyBackupCreationInfo) {
             [aliceSession1.crypto.backup createKeyBackupVersion:keyBackupCreationInfo success:^(MXKeyBackupVersion * _Nonnull keyBackupVersion) {
                 [aliceSession1.crypto.backup backupAllGroupSessions:^{
                     
                     
                     //- Alice signs in on a new device
-                    [matrixSDKTestsE2EData loginUserOnANewDevice:self credentials:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
+                    [matrixSDKTestsE2EData loginUserOnANewDevice:aliceSession1.matrixRestClient.credentials withPassword:MXTESTS_ALICE_PWD onComplete:^(MXSession *aliceSession2) {
                         
                         // - Disable key share requests on Alice2
-                        [aliceSession2.legacyCrypto setOutgoingKeyRequestsEnabled:NO onComplete:nil];
+                        [aliceSession2.crypto setOutgoingKeyRequestsEnabled:NO onComplete:nil];
                         
                         
                         // - Alice2 pagingates in the room
                         MXRoom *roomFromAlice2POV = [aliceSession2 roomWithRoomId:roomId];
-                        [roomFromAlice2POV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                        [roomFromAlice2POV liveTimeline:^(MXEventTimeline *liveTimeline) {
                             [liveTimeline resetPagination];
                             [liveTimeline paginate:10 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
                                 
@@ -394,10 +383,10 @@
                                         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                                             
                                             // -> After a bit, Alice2 should have all keys
-                                            XCTAssertEqual(aliceSession2.legacyCrypto.store.inboundGroupSessions.count, aliceSession1.legacyCrypto.store.inboundGroupSessions.count);
+                                            XCTAssertEqual(aliceSession2.crypto.store.inboundGroupSessions.count, aliceSession1.crypto.store.inboundGroupSessions.count);
                                             
                                             // -> key share requests on Alice2 are enabled again
-                                            XCTAssertTrue(aliceSession2.legacyCrypto.isOutgoingKeyRequestsEnabled);
+                                            XCTAssertTrue(aliceSession2.crypto.isOutgoingKeyRequestsEnabled);
                                             
                                             [expectation fulfill];
                                         });
@@ -465,7 +454,7 @@
 
         // - Make Alice paginate back in the room
         MXRoom *roomFromAlicePOV = [aliceSession roomWithRoomId:roomId];
-        [roomFromAlicePOV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+        [roomFromAlicePOV liveTimeline:^(MXEventTimeline *liveTimeline) {
 
             [liveTimeline resetPagination];
             [liveTimeline paginate:30 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
@@ -521,13 +510,13 @@
     [self createScenario:^(MXSession *aliceSession, NSString *roomId, MXMegolmSessionData *sessionData, MXMegolmSessionData *partialSessionData, XCTestExpectation *expectation) {
 
         // - Import the partial megolm session data
-        [aliceSession.legacyCrypto importMegolmSessionDatas:@[partialSessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
+        [aliceSession.crypto importMegolmSessionDatas:@[partialSessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
 
             // -> It must be successfully imported
             XCTAssertEqual(imported, 1);
 
             // - Import the full megolm session dats
-            [aliceSession.legacyCrypto importMegolmSessionDatas:@[sessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
+            [aliceSession.crypto importMegolmSessionDatas:@[sessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
 
                 // -> It must be successfully imported
                 XCTAssertEqual(imported, 1);
@@ -559,13 +548,13 @@
     [self createScenario:^(MXSession *aliceSession, NSString *roomId, MXMegolmSessionData *sessionData, MXMegolmSessionData *partialSessionData, XCTestExpectation *expectation) {
 
         // - Import the full megolm session data
-        [aliceSession.legacyCrypto importMegolmSessionDatas:@[sessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
+        [aliceSession.crypto importMegolmSessionDatas:@[sessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
 
             // -> It must be successfully imported
             XCTAssertEqual(imported, 1);
 
             // - Import the partial megolm session data
-            [aliceSession.legacyCrypto importMegolmSessionDatas:@[partialSessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
+            [aliceSession.crypto importMegolmSessionDatas:@[partialSessionData] backUp:NO success:^(NSUInteger total, NSUInteger imported) {
 
                 // -> It must not be imported
                 XCTAssertEqual(imported, 0);
@@ -580,241 +569,6 @@
             [expectation fulfill];
         }];
     }];
-}
-
-/**
- Test that we share the correct session keys for encrypted rooms when inviting
- another user to the room, so that they can read any immediate context relevant
- to their invite.
- 
- - Alice creates a new room
- -> She has no inbound session keys so far
- - Alice sends one message to the room
- -> Alice has one inbound session keys
- - She changes the room's history visibility to not shared and sends another message
- -> Alice now has two inbdound session keys, one with `sharedHistory` true and the other false
- - She changes the visibility back to shared and sends last message
- -> Alice now has 3 keys, 2 with `sharedHistory`, one without
- - Alice invites Bob into the room
- -> Bob has recieved only 2 session keys, namely those with `sharedHistory` set to true
- */
-- (void)testShareHistoryKeysWithInvitedUser
-{
-    [matrixSDKTestsE2EData doE2ETestWithAliceInARoom:self
-                                            andStore:[[MXMemoryStore alloc] init]
-                                         readyToTest:^(MXSession *aliceSession, NSString *roomId, XCTestExpectation *expectation)
-     {
-        void (^failureBlock)(NSError *) = ^(NSError *error)
-        {
-            XCTFail("Test failure - %@", error);
-            [expectation fulfill];
-        };
-        
-        [MXSDKOptions sharedInstance].enableRoomSharedHistoryOnInvite = YES;
-        [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-        [matrixSDKTestsData doMXSessionTestWithBob:nil
-                                       readyToTest:^(MXSession *bobSession, XCTestExpectation *expectation2)
-         {
-            // No keys present at the beginning
-            MXRoom *room = [aliceSession roomWithRoomId:roomId];
-            XCTAssertEqual([self numberOfKeysInSession:aliceSession], 0);
-            
-            [self sendMessage:@"Hello" room:room success:^{
-                // Sending one message will create the first session
-                XCTAssertEqual([self numberOfKeysInSession:aliceSession], 1);
-                
-                [self setHistoryVisibility:kMXRoomHistoryVisibilityJoined room:room success:^{
-                    [self sendMessage:@"Hi" room:room success:^{
-                        // The room visibility has changed, so sending another message will rotate
-                        // megolm sessions, increasing to total of 2
-                        XCTAssertEqual([self numberOfKeysInSession:aliceSession], 2);
-                        
-                        [self setHistoryVisibility:kMXRoomHistoryVisibilityShared room:room success:^{
-                            [self sendMessage:@"How are you?" room:room success:^{
-                                // The room visibility has changed again, so another rotation leads to 3 sessions
-                                XCTAssertEqual([self numberOfKeysInSession:aliceSession], 3);
-                                
-                                // Finally inviting a user (the outcome of this captured in the notification listener)
-                                [room inviteUser:bobSession.myUser.userId success:^{
-                                } failure:failureBlock];
-                            } failure:failureBlock];
-                        } failure:failureBlock];
-                    } failure:failureBlock];
-                } failure:failureBlock];
-            } failure:failureBlock];
-            
-            // Listen to a notification of to_device events, which will store keys on Bob's device
-            __block id observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionOnToDeviceEventNotification
-                                                                                    object:bobSession
-                                                                                     queue:[NSOperationQueue mainQueue]
-                                                                                usingBlock:^(NSNotification *notif)
-                                   {
-                
-                // Give some extra time, as we are storing keys in Realm
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                    if (observer)
-                    {
-                        [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                        observer = nil;
-                        
-                        // Bob should only have recieved 2 keys, as the third Alice's key has `sharedHistory` set to false
-                        XCTAssertEqual([self numberOfKeysInSession:bobSession], 2);
-                        [expectation fulfill];
-                    }
-                });
-            }];
-        }];
-    }];
-}
-
-/**
- Test that we preserve the `sharedHistory` flag as we pass keys between different devices
- and different users
- 
- - Alice creates a new room, sends a few messages and logs in with another device
- -> Her second device has the same amount of keys as the first, even if some of the keys do not have shared history
- - Alice invites Bob into the room from her second device
- -> Bob has recieved only 2 session keys, namely those with `sharedHistory` set to true
- */
-// TODO: test is currently broken
-- (void)xtestSharedHistoryPreservedWhenForwardingKeys
-{
-    [matrixSDKTestsE2EData doE2ETestWithAliceInARoom:self
-                                            andStore:[[MXMemoryStore alloc] init]
-                                         readyToTest:^(MXSession *aliceSession1, NSString *roomId, XCTestExpectation *expectation)
-     {
-        void (^failureBlock)(NSError *) = ^(NSError *error)
-        {
-            XCTFail("Test failure - %@", error);
-            [expectation fulfill];
-        };
-        
-        [MXSDKOptions sharedInstance].enableRoomSharedHistoryOnInvite = YES;
-        [MXSDKOptions sharedInstance].enableCryptoWhenStartingMXSession = YES;
-        [matrixSDKTestsData doMXSessionTestWithBob:nil
-                                       readyToTest:^(MXSession *bobSession, XCTestExpectation *expectation2)
-         {
-            
-            // Send a bunch of messages whilst changing room visibility
-            MXRoom *room = [aliceSession1 roomWithRoomId:roomId];
-            [self sendMessage:@"Hello" room:room success:^{
-                [self setHistoryVisibility:kMXRoomHistoryVisibilityJoined room:room success:^{
-                    [self sendMessage:@"Hi" room:room success:^{
-                        [self setHistoryVisibility:kMXRoomHistoryVisibilityShared room:room success:^{
-                            [self sendMessage:@"How are you?" room:room success:^{
-                                
-                                // Alice signs in on a new device
-                                [matrixSDKTestsE2EData loginUserOnANewDevice:self
-                                                                 credentials:aliceSession1.matrixRestClient.credentials
-                                                                withPassword:MXTESTS_ALICE_PWD store:[[MXMemoryStore alloc] init]
-                                                                  onComplete:^(MXSession *aliceSession2)
-                                 {
-                                    
-                                    // Initially Alice2 has no keys
-                                    XCTAssertEqual([self numberOfKeysInSession:aliceSession2], 0);
-                                    
-                                    __block id observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionNewRoomNotification
-                                                                                                            object:aliceSession2
-                                                                                                             queue:[NSOperationQueue mainQueue]
-                                                                                                        usingBlock:^(NSNotification *notif)
-                                                           {
-                                        if (!observer) { return; }
-                                        [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                                        observer = nil;
-                                        
-                                        // Make each Alice device trust each other
-                                        [aliceSession1.crypto setDeviceVerification:MXDeviceVerified forDevice:aliceSession2.myDeviceId ofUser:aliceSession1.myUserId success:^{
-                                            [aliceSession2.crypto setDeviceVerification:MXDeviceVerified forDevice:aliceSession1.myDeviceId ofUser:aliceSession1.myUserId success:^{
-                                                
-                                                // Alice2 paginates in the room to get the keys forwarded to her
-                                                MXRoom *roomFromAlice2POV = [aliceSession2 roomWithRoomId:roomId];
-                                                [roomFromAlice2POV liveTimeline:^(id<MXEventTimeline> liveTimeline) {
-                                                    [liveTimeline resetPagination];
-                                                    [liveTimeline paginate:10 direction:MXTimelineDirectionBackwards onlyFromStore:NO complete:^{
-                                                        
-                                                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                                                            
-                                                            // Alice2 now has all 3 keys, despite only two of them having shared history
-                                                            XCTAssertEqual([self numberOfKeysInSession:aliceSession2], 3);
-                                                            
-                                                            // Now Alice2 invites Bob into the conversation
-                                                            [roomFromAlice2POV inviteUser:bobSession.myUser.userId success:^{
-                                                            } failure:failureBlock];
-                                                        });
-                                                    } failure:failureBlock];
-                                                }];
-                                            } failure:failureBlock];
-                                        } failure:failureBlock];
-                                    }];
-                                }];
-                            } failure:failureBlock];
-                        } failure:failureBlock];
-                    } failure:failureBlock];
-                } failure:failureBlock];
-            } failure:failureBlock];
-            
-            // Listen to a notification of to_device events, which will store keys on Bob's device
-            __block id observer = [[NSNotificationCenter defaultCenter] addObserverForName:kMXSessionOnToDeviceEventNotification
-                                                                                    object:bobSession
-                                                                                     queue:[NSOperationQueue mainQueue]
-                                                                                usingBlock:^(NSNotification *notif)
-                                   {
-                
-                // Give some extra time, sa we are storing keys in Realm
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                    if (observer)
-                    {
-                        [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                        observer = nil;
-                        
-                        // Bob should only have recieved 2 keys, as the third Alice's key has `sharedHistory` set to false
-                        XCTAssertEqual([self numberOfKeysInSession:bobSession], 2);
-                        [expectation fulfill];
-                    }
-                });
-            }];
-        }];
-    }];
-}
-
-#pragma mark - Helpers
-
-/**
- Get number of inbound keys stored in a session
- */
-- (NSUInteger)numberOfKeysInSession:(MXSession *)session
-{
-    return [session.legacyCrypto.store inboundGroupSessions].count;
-}
-
-/**
- Send message and await its delivery
- */
-- (void)sendMessage:(NSString *)message room:(MXRoom *)room success:(void(^)(void))success failure:(void(^)(NSError *error))failure
-{
-    __block id listener = [room listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage]
-                                              onEvent:^(MXEvent * _Nonnull event, MXTimelineDirection direction, MXRoomState * _Nullable roomState)
-    {
-        [room removeListener:listener];
-        success();
-    }];
-    
-    [room sendTextMessage:message threadId:nil success:nil failure:failure];
-}
-
-/**
- Set room visibility and awaits its processing
- */
-- (void)setHistoryVisibility:(MXRoomHistoryVisibility)historyVisibility room:(MXRoom *)room success:(void(^)(void))success failure:(void(^)(NSError *error))failure
-{
-    __block id listener = [room listenToEventsOfTypes:@[kMXEventTypeStringRoomHistoryVisibility]
-                                              onEvent:^(MXEvent * _Nonnull event, MXTimelineDirection direction, MXRoomState * _Nullable roomState)
-    {
-        [room removeListener:listener];
-        success();
-    }];
-    
-    [room setHistoryVisibility:historyVisibility success:nil failure:failure];
 }
 
 @end

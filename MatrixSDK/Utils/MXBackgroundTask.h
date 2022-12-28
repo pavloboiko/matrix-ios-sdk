@@ -21,37 +21,21 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@protocol MXBackgroundTask;
-
-typedef void (^MXBackgroundTaskExpirationHandler)(id<MXBackgroundTask>);
+typedef void (^MXBackgroundTaskExpirationHandler)(void);
 
 /**
  MXBackgroundTask is protocol describing a background task regardless of the platform used.
  */
 @protocol MXBackgroundTask <NSObject>
 
-/**
- Name of the background task for debug.
- */
-@property (nonatomic, copy, readonly) NSString *name;
+// Name of the background task for debug.
+@property (nonatomic, strong, readonly) NSString *name;
+
+// Yes if the background task is currently running.
+@property (nonatomic, readonly) BOOL isRunning;
 
 /**
- YES if the background task is currently running.
- */
-@property (nonatomic, readonly, getter=isRunning) BOOL running;
-
-/**
- Flag indicating the background task is reusable. If reusable, `name` is the key to distinguish background tasks.
- */
-@property (nonatomic, readonly, getter=isReusable) BOOL reusable;
-
-/**
- Method to be called when a task reused one more time. Should only be valid for reusable tasks.
- */
-- (void)reuse;
-
-/**
- Stop the background task. Cannot be started anymore. For reusable tasks, should be called same number of times `reuse` called.
+ Stop the background task. Cannot be started anymore.
  */
 - (void)stop;
 

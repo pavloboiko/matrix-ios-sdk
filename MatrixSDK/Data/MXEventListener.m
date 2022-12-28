@@ -43,20 +43,9 @@
     BOOL match = NO;
     if (_eventTypes)
     {
-        if (event.type)
+        if (NSNotFound != [_eventTypes indexOfObject:event.type])
         {
-            if (NSNotFound != [_eventTypes indexOfObject:event.type])
-            {
-                match = YES;
-            }
-        }
-        else if (event.wireType)
-        {
-            //  no event type, this is probably a redacted event
-            if (NSNotFound != [_eventTypes indexOfObject:event.wireType])
-            {
-                match = YES;
-            }
+            match = YES;
         }
     }
     else
@@ -70,15 +59,6 @@
     {
         _listenerBlock(event, direction, customObject);
     }
-}
-
-#pragma mark - NSCopying
-
-- (id)copyWithZone:(NSZone *)zone
-{
-    return [[[self class] allocWithZone:zone] initWithSender:_sender
-                                               andEventTypes:_eventTypes
-                                            andListenerBlock:_listenerBlock];
 }
 
 @end

@@ -16,7 +16,6 @@
 
 #import "MXJingleCameraCaptureController.h"
 
-#import "MXLog.h"
 #import <WebRTC/RTCCameraVideoCapturer.h>
 
 static const Float64 kFramerateLimit = 30.0;
@@ -49,13 +48,13 @@ static const int kDefaultResolutionHeight = 720;
     
     if (format == nil)
     {
-        MXLogDebug(@"[MXJingleCameraCaptureController] No valid formats for device %@", device);
+        NSLog(@"[MXJingleCameraCaptureController] No valid formats for device %@", device);
         return;
     }
     
     NSInteger fps = [self selectFpsForFormat:format];
     
-    MXLogDebug(@"[MXJingleCameraCaptureController] start capture with device: %@\nfps: %ld\nformat: %@", device.localizedName, (long)fps, format);
+    NSLog(@"[MXJingleCameraCaptureController] start capture with device: %@\nfps: %ld\nformat: %@", device.localizedName, (long)fps, format);
     
     [_capturer startCaptureWithDevice:device format:format fps:fps];
 }

@@ -47,19 +47,6 @@ NS_ASSUME_NONNULL_BEGIN
                              failure:(void (^)(NSError *error))failure;
 
 /**
- Hold/resume the call. Creates an offer.
-
- The created sdp will be sent to the Matrix room in a m.call.negotiate event.
-
- @param success A block object called when the operation succeeds. It provides a description
-                of the offer.
- @param failure A block object called when the operation fails.
- */
-- (void)hold:(BOOL)hold
-     success:(void (^)(NSString *sdp))success
-     failure:(void (^)(NSError *))failure;
-
-/**
  Terminate the call.
  */
 - (void)end;
@@ -114,6 +101,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)createAnswer:(void (^)(NSString *sdpAnswer))success
              failure:(void (^)(NSError *error))failure;
 
+
 #pragma mark - Outgoing call
 /**
  Create an offer.
@@ -140,20 +128,6 @@ NS_ASSUME_NONNULL_BEGIN
              success:(void (^)(void))success
              failure:(void (^)(NSError *error))failure;
 
-#pragma mark - DTMF
-
-/**
- Indicates whether this call can send DTMF tones.
- This property will be false if the call is not connected yet.
- */
-@property (nonatomic, readonly) BOOL canSendDTMF;
-
-/**
- Creates a task to send given DTMF tones in the call. If there is a task already running, it'll be canceled.
- @param tones DTMF tones to be sent. Allowed characters: [0-9], [A-D], '#', `*`. Case insensitive. Comma (',') will cause a 2 seconds delay before sending next character.
- @returns Whether the operation succeeded or not.
- */
-- (BOOL)sendDTMF:(NSString * _Nonnull)tones;
 
 #pragma mark - Properties
 /**
@@ -199,6 +173,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL videoMuted;
 
 /**
+ NO by default, the inbound audio is then routed to the default audio outputs.
+ If YES, the inbound audio is sent to the main speaker.
+ */
+@property (nonatomic) BOOL audioToSpeaker;
+
+/**
  The camera to use.
  Default is AVCaptureDevicePositionFront.
  */
@@ -237,13 +217,6 @@ NS_ASSUME_NONNULL_BEGIN
  @param callStackCall the corresponding instance.
  */
 - (void)callStackCallDidConnect:(id<MXCallStackCall>)callStackCall;
-
-/**
- Tells the delegate that connection was held by the remote peer
- 
- @param callStackCall the corresponding instance.
- */
-- (void)callStackCallDidRemotelyHold:(id<MXCallStackCall>)callStackCall;
 
 @end
 

@@ -80,14 +80,14 @@ NS_ERROR_ENUM(MXIdentityServerRestClientErrorDomain)
 @property (nonatomic, strong, nullable) NSString *preferredAPIPathPrefix;
 
 /**
- Block called when an authenticated request fails and is used  to validate the response error.
+ Block called when a request needs authorization and access token should be renewed.
  */
-@property (nonatomic, copy) MXHTTPClientTokenValidationResponseHandler tokenValidationResponseHandler;
+@property (nonatomic, copy) MXHTTPClientShouldRenewTokenHandler shouldRenewTokenHandler;
 
 /**
- Block called when an authenticated request requires an access token.
+ Block called when a request fails and needs authorization to determine if the access token should be renewed.
  */
-@property (nonatomic, copy) MXHTTPClientTokenProviderHandler tokenProviderHandler;
+@property (nonatomic, copy) MXHTTPClientRenewTokenHandler renewTokenHandler;
 
 #pragma mark - Setup
 
@@ -318,6 +318,20 @@ NS_ERROR_ENUM(MXIdentityServerRestClientErrorDomain)
                        mxid:(NSString*)mxid
                     success:(void (^)(NSDictionary *thirdPartySigned))success
                     failure:(void (^)(NSError *error))failure NS_REFINED_FOR_SWIFT;
+
+/**
+ Get current access or get a new one if not exist.
+ Note: There is no guarantee that current access token is valid.
+ 
+ @param success A block object called when the operation succeeds. It provides the access token.
+ @param failure A block object called when the operation fails.
+ 
+ @return a MXHTTPOperation instance. Nil if the access token is already known
+ and no HTTP request is required.
+ */
+- (MXHTTPOperation *)getAccessTokenAndRenewIfNeededWithSuccess:(void (^)(NSString *accessToken))success
+                                                       failure:(void (^)(NSError *error))failure;
+
 
 @end
 

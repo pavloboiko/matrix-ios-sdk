@@ -19,21 +19,18 @@
 #import "MXKeyVerificationReady.h"
 #import "MXKeyVerificationCancel.h"
 
-MX_ASSUME_MISSING_NULLABILITY_BEGIN
-
-@class MXLegacyKeyVerificationManager, MXHTTPOperation;
+@class MXKeyVerificationManager, MXHTTPOperation;
 
 
 /**
  The `MXKeyVerificationRequest` extension exposes internal operations.
  */
-@interface MXLegacyKeyVerificationRequest ()
+@interface MXKeyVerificationRequest ()
 
-@property (nonatomic, readonly, weak) MXLegacyKeyVerificationManager *manager;
+@property (nonatomic, readonly, weak) MXKeyVerificationManager *manager;
 
-- (instancetype)initWithEvent:(MXEvent*)event andManager:(MXLegacyKeyVerificationManager*)manager;
+- (instancetype)initWithEvent:(MXEvent*)event andManager:(MXKeyVerificationManager*)manager;
 
-@property (nonatomic, nullable) MXTransactionCancelCode *reasonCancelCode;
 @property (nonatomic) BOOL isFromMyUser;
 @property (nonatomic) BOOL isFromMyDevice;
 
@@ -45,5 +42,3 @@ MX_ASSUME_MISSING_NULLABILITY_BEGIN
 - (void)handleCancel:(MXKeyVerificationCancel*)cancelContent;
 
 @end
-
-MX_ASSUME_MISSING_NULLABILITY_END

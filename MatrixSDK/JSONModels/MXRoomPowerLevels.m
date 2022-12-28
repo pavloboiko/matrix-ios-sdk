@@ -18,8 +18,6 @@
 
 #import "MXTools.h"
 
-NSInteger const MXRoomPowerLevelUndefined = -1;
-
 @implementation MXRoomPowerLevels
 
 + (id)modelFromJSON:(NSDictionary *)JSONDictionary
@@ -87,29 +85,12 @@ NSInteger const MXRoomPowerLevelUndefined = -1;
     self = [super init];
     if (self)
     {
-        _usersDefault = _eventsDefault = _stateDefault = _ban = _kick = _redact = _invite = MXRoomPowerLevelUndefined;
-    }
-    return self;
-}
-
-- (instancetype)initWithDefaultSpecValues
-{
-    self = [super init];
-    if (self)
-    {
-        // See default values here https://matrix.org/docs/spec/client_server/latest#m-room-power-levels
-        
         // Filled default values as specified by the doc
         _usersDefault = 0;
 
         // If the room contains no power_levels event, the state_default is 0. The events_default is 0 in either of these cases.
         _eventsDefault = 0;
         _stateDefault = 0;
-        
-        _ban = 50;
-        _kick = 50;
-        _invite = 50;
-        _redact = 50;
     }
     return self;
 }
@@ -187,46 +168,17 @@ NSInteger const MXRoomPowerLevelUndefined = -1;
 - (NSDictionary *)JSONDictionary
 {
     NSMutableDictionary *JSONDictionary = [NSMutableDictionary dictionary];
-    
+
     JSONDictionary[@"users"] = _users;
-    
-    if (_usersDefault != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"users_default"] = @(_usersDefault);
-    }
-    
-    if (_ban != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"ban"] = @(_ban);
-    }
-    
-    if (_kick != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"kick"] = @(_kick);
-    }
-    
-    if (_redact != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"redact"] = @(_redact);
-    }
-    
-    if (_invite != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"invite"] = @(_invite);
-    }
-        
+    JSONDictionary[@"users_default"] = @(_usersDefault);
+    JSONDictionary[@"ban"] = @(_ban);
+    JSONDictionary[@"kick"] = @(_kick);
+    JSONDictionary[@"redact"] = @(_redact);
+    JSONDictionary[@"invite"] = @(_invite);
     JSONDictionary[@"notifications"] = _notifications;
     JSONDictionary[@"events"] = _events;
-    
-    if (_eventsDefault != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"events_default"] = @(_eventsDefault);
-    }
-    
-    if (_stateDefault != MXRoomPowerLevelUndefined)
-    {
-        JSONDictionary[@"state_default"] = @(_stateDefault);
-    }
+    JSONDictionary[@"events_default"] = @(_eventsDefault);
+    JSONDictionary[@"state_default"] = @(_stateDefault);
 
     return JSONDictionary;
 }

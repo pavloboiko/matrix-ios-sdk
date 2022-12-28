@@ -24,10 +24,6 @@ const struct MXMatrixClientServerAPIVersionStruct MXMatrixClientServerAPIVersion
     .r0_4_0 = @"r0.4.0",
     .r0_5_0 = @"r0.5.0",
     .r0_6_0 = @"r0.6.0",
-    .r0_6_1 = @"r0.6.1",
-    .v1_1   = @"v1.1",
-    .v1_2   = @"v1.2",
-    .v1_3   = @"v1.3"
 };
 
 const struct MXMatrixVersionsFeatureStruct MXMatrixVersionsFeature = {
@@ -37,140 +33,52 @@ const struct MXMatrixVersionsFeatureStruct MXMatrixVersionsFeature = {
     .separateAddAndBind = @"m.separate_add_and_bind"
 };
 
-static NSString* const kJSONKeyVersions = @"versions";
-static NSString* const kJSONKeyUnstableFeatures = @"unstable_features";
-
-//  Unstable features
-static NSString* const kJSONKeyMSC3440 = @"org.matrix.msc3440.stable";
-static NSString* const kJSONKeyMSC3881Unstable = @"org.matrix.msc3881";
-static NSString* const kJSONKeyMSC3881 = @"org.matrix.msc3881.stable";
-static NSString* const kJSONKeyMSC3882 = @"org.matrix.msc3882";
-static NSString* const kJSONKeyMSC3773 = @"org.matrix.msc3773";
-
-@interface MXMatrixVersions ()
-
-@property (nonatomic, readwrite) NSArray<NSString *> *versions;
-@property (nonatomic, nullable, readwrite) NSDictionary<NSString*, NSNumber*> *unstableFeatures;
-
-@end
-
 @implementation MXMatrixVersions
 
 + (id)modelFromJSON:(NSDictionary *)JSONDictionary
 {
-    if (JSONDictionary[kJSONKeyVersions])
+    MXMatrixVersions *matrixVersions = [[MXMatrixVersions alloc] init];
+    if (matrixVersions)
     {
-        MXMatrixVersions *result = [MXMatrixVersions new];
-
-        MXJSONModelSetArray(result.versions, JSONDictionary[kJSONKeyVersions]);
-        MXJSONModelSetDictionary(result.unstableFeatures, JSONDictionary[kJSONKeyUnstableFeatures]);
-
-        return result;
+        MXJSONModelSetArray(matrixVersions.versions, JSONDictionary[@"versions"]);
+        MXJSONModelSetDictionary(matrixVersions.unstableFeatures, JSONDictionary[@"unstable_features"]);
     }
-    return nil;
-}
-
-- (NSDictionary *)JSONDictionary
-{
-    NSMutableDictionary *JSONDictionary = [NSMutableDictionary dictionary];
-
-    JSONDictionary[kJSONKeyVersions] = self.versions;
-
-    if (self.unstableFeatures)
-    {
-        JSONDictionary[kJSONKeyUnstableFeatures] = self.unstableFeatures;
-    }
-
-    return JSONDictionary;
+    return matrixVersions;
 }
 
 - (BOOL)supportLazyLoadMembers
 {
-    return [self serverSupportsVersion:MXMatrixClientServerAPIVersion.r0_5_0]
-    || [self serverSupportsFeature:MXMatrixVersionsFeature.lazyLoadMembers];
+    return [self.versions containsObject:MXMatrixClientServerAPIVersion.r0_5_0]
+        || [self.unstableFeatures[MXMatrixVersionsFeature.lazyLoadMembers] boolValue];
 }
 
 - (BOOL)doesServerRequireIdentityServerParam
 {
-    if ([self serverSupportsVersion:MXMatrixClientServerAPIVersion.r0_6_0])
+    // YES by default
+    BOOL doesServerRequireIdentityServerParam = YES;
+
+    if ([self.versions containsObject:MXMatrixClientServerAPIVersion.r0_6_0])
     {
-        return NO;
+        doesServerRequireIdentityServerParam = NO;
+    }
+    else if (self.unstableFeatures[MXMatrixVersionsFeature.requireIdentityServer])
+    {
+        doesServerRequireIdentityServerParam = [self.unstableFeatures[MXMatrixVersionsFeature.requireIdentityServer] boolValue];
     }
 
-    return [self serverSupportsFeature:MXMatrixVersionsFeature.requireIdentityServer
-                          defaultValue:YES];
+    return doesServerRequireIdentityServerParam;
 }
 
 - (BOOL)doesServerAcceptIdentityAccessToken
 {
-    return [self serverSupportsVersion:MXMatrixClientServerAPIVersion.r0_6_0]
-    || [self serverSupportsFeature:MXMatrixVersionsFeature.idAccessToken];
+    return  [self.versions containsObject:MXMatrixClientServerAPIVersion.r0_6_0]
+        || [self.unstableFeatures[MXMatrixVersionsFeature.idAccessToken] boolValue];
 }
 
 - (BOOL)doesServerSupportSeparateAddAndBind
 {
-    return [self serverSupportsVersion:MXMatrixClientServerAPIVersion.r0_6_0]
-    || [self serverSupportsFeature:MXMatrixVersionsFeature.separateAddAndBind];
-}
-
-- (BOOL)supportsThreads
-{
-    // TODO: Check for v1.3 or whichever spec version formally specifies MSC3440.
-    return [self serverSupportsFeature:kJSONKeyMSC3440];
-}
-
-- (BOOL)supportsRemotelyTogglingPushNotifications
-{
-    return [self serverSupportsFeature:kJSONKeyMSC3881] || [self serverSupportsFeature:kJSONKeyMSC3881Unstable];
-}
-
-- (BOOL)supportsQRLogin
-{
-    return [self serverSupportsFeature:kJSONKeyMSC3882];
-}
-
-- (BOOL)supportsNotificationsForThreads {
-    return [self serverSupportsFeature:kJSONKeyMSC3773];
-}
-
-#pragma mark - Private
-
-- (BOOL)serverSupportsVersion:(NSString *)version
-{
-    //  we might improve this logic in future, so moved into a dedicated method.
-    return [self.versions containsObject:version];
-}
-
-- (BOOL)serverSupportsFeature:(NSString *)feature
-{
-    return [self serverSupportsFeature:feature defaultValue:NO];
-}
-
-- (BOOL)serverSupportsFeature:(NSString *)feature defaultValue:(BOOL)defaultValue
-{
-    if (self.unstableFeatures[feature])
-    {
-        return self.unstableFeatures[feature].boolValue;
-    }
-    return defaultValue;
-}
-
-#pragma mark - NSCoding
-
-- (id)initWithCoder:(NSCoder *)aDecoder
-{
-    if (self = [super init])
-    {
-        self.versions = [aDecoder decodeObjectForKey:kJSONKeyVersions];
-        self.unstableFeatures = [aDecoder decodeObjectForKey:kJSONKeyUnstableFeatures];
-    }
-    return self;
-}
-
-- (void)encodeWithCoder:(NSCoder *)aCoder
-{
-    [aCoder encodeObject:self.versions forKey:kJSONKeyVersions];
-    [aCoder encodeObject:self.unstableFeatures forKey:kJSONKeyUnstableFeatures];
+    return  [self.versions containsObject:MXMatrixClientServerAPIVersion.r0_6_0]
+        || [self.unstableFeatures[MXMatrixVersionsFeature.separateAddAndBind] boolValue];
 }
 
 @end

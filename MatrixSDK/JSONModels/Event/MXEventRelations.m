@@ -19,7 +19,6 @@
 #import "MXEventAnnotationChunk.h"
 #import "MXEventReferenceChunk.h"
 #import "MXEventReplace.h"
-#import "MXEventRelationThread.h"
 #import "MXEvent.h"
 
 @implementation MXEventRelations
@@ -31,24 +30,21 @@
     MXEventRelations *relations;
 
     MXEventAnnotationChunk *annotation;
-    MXJSONModelSetMXJSONModel(annotation, MXEventAnnotationChunk, JSONDictionary[MXEventRelationTypeAnnotation]);
+    MXJSONModelSetMXJSONModel(annotation, MXEventAnnotationChunk, JSONDictionary[@"m.annotation"]);
 
     MXEventReferenceChunk *reference;
-    MXJSONModelSetMXJSONModel(reference, MXEventReferenceChunk, JSONDictionary[MXEventRelationTypeReference]);
+    MXJSONModelSetMXJSONModel(reference, MXEventReferenceChunk, JSONDictionary[@"m.reference"]);
 
+    
     MXEventReplace *eventReplace;
     MXJSONModelSetMXJSONModel(eventReplace, MXEventReplace, JSONDictionary[MXEventRelationTypeReplace]);
 
-    MXEventRelationThread *thread;
-    MXJSONModelSetMXJSONModel(thread, MXEventRelationThread, JSONDictionary[MXEventRelationTypeThread]);
-
-    if (annotation || reference || eventReplace || thread)
+    if (annotation || reference || eventReplace)
     {
         relations = [MXEventRelations new];
         relations->_annotation = annotation;
         relations->_reference = reference;
         relations->_replace = eventReplace;
-        relations->_thread = thread;
     }
 
     return relations;
@@ -61,22 +57,17 @@
     {
         if (_annotation)
         {
-            JSONDictionary[MXEventRelationTypeAnnotation] = _annotation.JSONDictionary;
+            JSONDictionary[@"m.annotation"] = _annotation.JSONDictionary;                        
         }
 
         if (_reference)
         {
-            JSONDictionary[MXEventRelationTypeReference] = _reference.JSONDictionary;
+            JSONDictionary[@"m.reference"] = _reference.JSONDictionary;
         }
 
         if (_replace)
         {
             JSONDictionary[MXEventRelationTypeReplace] = _replace.JSONDictionary;
-        }
-
-        if (_thread)
-        {
-            JSONDictionary[MXEventRelationTypeThread] = _thread.JSONDictionary;
         }
     }
 

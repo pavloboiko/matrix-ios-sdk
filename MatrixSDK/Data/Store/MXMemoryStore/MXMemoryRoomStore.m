@@ -20,13 +20,14 @@
 #import "MXEventsEnumeratorOnArray.h"
 #import "MXEventsByTypesEnumeratorOnArray.h"
 
-@interface MXMemoryRoomStore () <MXEventsEnumeratorDataSource>
+@interface MXMemoryRoomStore ()
 {
 }
 
 @end
 
 @implementation MXMemoryRoomStore
+@synthesize outgoingMessages;
 
 - (instancetype)init
 {
@@ -35,6 +36,7 @@
     {
         messages = [NSMutableArray array];
         messagesByEventIds = [NSMutableDictionary dictionary];
+        outgoingMessages = [NSMutableArray array];
         _hasReachedHomeServerPaginationEnd = NO;
         _hasLoadedAllRoomMembersForRoom = NO;
     }
@@ -85,69 +87,22 @@
     [messagesByEventIds removeAllObjects];
 }
 
-- (NSArray <NSString *>*)allEventIds
-{
-    NSMutableArray *eventIds = [[NSMutableArray alloc] initWithCapacity:messages.count];
-    for (MXEvent *event in messages) {
-        [eventIds addObject:event.eventId];
-    }
-    return eventIds.copy;
-}
-
 - (id<MXEventsEnumerator>)messagesEnumerator
 {
-    return [[MXEventsEnumeratorOnArray alloc] initWithEventIds:[self allEventIds] dataSource:self];
+    return [[MXEventsEnumeratorOnArray alloc] initWithMessages:messages];
 }
 
 - (id<MXEventsEnumerator>)enumeratorForMessagesWithTypeIn:(NSArray*)types
 {
-    return [[MXEventsByTypesEnumeratorOnArray alloc] initWithEventIds:[self allEventIds] andTypesIn:types dataSource:self];
+    return [[MXEventsByTypesEnumeratorOnArray alloc] initWithMessages:messages andTypesIn:types];
 }
 
-- (NSArray<MXEvent*>*)eventsInThreadWithThreadId:(NSString *)threadId except:(NSString *)userId withTypeIn:(NSSet<MXEventTypeString>*)types
-{
-    NSMutableArray* list = [[NSMutableArray alloc] init];
-    
-    if (threadId == nil || [threadId isEqualToString:kMXEventTimelineMain])
-    {
-        MXLogWarning(@"[MXMemoryRoomStore] eventsInThreadWithThreadId: invalid thread ID %@", threadId);
-        return list;
-    }
-
-    // Check messages from the most recent
-    for (NSInteger i = messages.count - 1; i >= 0 ; i--)
-    {
-        MXEvent *event = messages[i];
-
-        // Check if the event is the root event of the thread
-        if (NO == [event.eventId isEqualToString:threadId])
-        {
-            // Keep events matching filters
-            BOOL typeAllowed = !types || [types containsObject:event.type];
-            BOOL threadAllowed = [event.threadId isEqualToString:threadId];
-            BOOL senderAllowed = ![event.sender isEqualToString:userId];
-            if (typeAllowed && threadAllowed && senderAllowed)
-            {
-                [list insertObject:event atIndex:0];
-            }
-        }
-        else
-        {
-            // We are done
-            break;
-        }
-    }
-
-    return list;
-}
-
-- (NSArray<MXEvent*>*)eventsAfter:(NSString *)eventId threadId:(NSString *)threadId except:(NSString *)userId withTypeIn:(NSSet<MXEventTypeString>*)types
+- (NSArray*)eventsAfter:(NSString *)eventId except:(NSString*)userId withTypeIn:(NSSet*)types
 {
     NSMutableArray* list = [[NSMutableArray alloc] init];
 
     if (eventId)
     {
-        NSString *_threadId = ![threadId isEqualToString:kMXEventTimelineMain] ? threadId : nil;
         // Check messages from the most recent
         for (NSInteger i = messages.count - 1; i >= 0 ; i--)
         {
@@ -156,10 +111,7 @@
             if (NO == [event.eventId isEqualToString:eventId])
             {
                 // Keep events matching filters
-                BOOL typeAllowed = !types || [types containsObject:event.type];
-                BOOL threadAllowed = (!_threadId && !event.isInThread) || [event.threadId isEqualToString:_threadId];
-                BOOL senderAllowed = ![event.sender isEqualToString:userId];
-                if (typeAllowed && threadAllowed && senderAllowed)
+                if ((!types || [types containsObject:event.type]) && ![event.sender isEqualToString:userId])
                 {
                     [list insertObject:event atIndex:0];
                 }
@@ -190,6 +142,33 @@
     }
     
     return referenceEvents;
+}
+
+- (void)storeOutgoingMessage:(MXEvent*)outgoingMessage
+{
+    // Sanity check: prevent from adding multiple occurrences of the same object.
+    if ([outgoingMessages indexOfObject:outgoingMessage] == NSNotFound)
+    {
+        [outgoingMessages addObject:outgoingMessage];
+    }
+}
+
+- (void)removeAllOutgoingMessages
+{
+    [outgoingMessages removeAllObjects];
+}
+
+- (void)removeOutgoingMessage:(NSString*)outgoingMessageEventId
+{
+    for (NSUInteger i = 0; i < outgoingMessages.count; i++)
+    {
+        MXEvent *outgoingMessage = outgoingMessages[i];
+        if ([outgoingMessage.eventId isEqualToString:outgoingMessageEventId])
+        {
+            [outgoingMessages removeObjectAtIndex:i];
+            break;
+        }
+    }
 }
 
 - (NSString *)description

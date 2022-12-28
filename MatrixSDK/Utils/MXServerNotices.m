@@ -132,7 +132,7 @@ NSUInteger const kMXServerNoticesMaxPinnedNoticesPerRoom = 2;
         for (MXEvent *pinnedEvent in pinnedEvents)
         {
             if (pinnedEvent.eventType == MXEventTypeRoomMessage
-                && [pinnedEvent.content[kMXMessageTypeKey] isEqualToString:kMXMessageTypeServerNotice])
+                && [pinnedEvent.content[@"msgtype"] isEqualToString:kMXMessageTypeServerNotice])
             {
                 // For now, there is only one server notice, usage limit
                 self.usageLimit = [MXServerNoticeContent modelFromJSON:pinnedEvent.content];
@@ -181,11 +181,7 @@ NSUInteger const kMXServerNoticesMaxPinnedNoticesPerRoom = 2;
 
                 } failure:^(NSError *error) {
 
-                    NSDictionary *details = @{
-                        @"event_id": pinnedEventId ?: @"unknown",
-                        @"error": error ?: @"unknown"
-                    };
-                    MXLogErrorDetails(@"[MXServerNotices] Failed to get pinned event. Continue anyway", details);
+                    NSLog(@"[MXServerNotices] Failed to get pinned event %@. Continue anyway", pinnedEventId);
                     dispatch_group_leave(group);
                 }];
             }

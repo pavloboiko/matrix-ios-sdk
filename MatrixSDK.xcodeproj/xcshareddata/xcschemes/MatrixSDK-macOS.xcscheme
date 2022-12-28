@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1340"
-   version = "1.7">
+   LastUpgradeVersion = "1030"
+   version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
@@ -23,13 +23,13 @@
          <BuildActionEntry
             buildForTesting = "YES"
             buildForRunning = "YES"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B1E09A0D2397FA950057C069"
-               BuildableName = "MatrixSDKTests.xctest"
+               BuildableName = "MatrixSDKTests-macOS.xctest"
                BlueprintName = "MatrixSDKTests-macOS"
                ReferencedContainer = "container:MatrixSDK.xcodeproj">
             </BuildableReference>
@@ -41,6 +41,18 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "B1E09A0D2397FA950057C069"
+               BuildableName = "MatrixSDKTests-macOS.xctest"
+               BlueprintName = "MatrixSDKTests-macOS"
+               ReferencedContainer = "container:MatrixSDK.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
@@ -50,39 +62,8 @@
             ReferencedContainer = "container:MatrixSDK.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
-      <TestPlans>
-         <TestPlanReference
-            reference = "container:MatrixSDKTests/TestPlans/AllTests.xctestplan"
-            default = "YES">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:MatrixSDKTests/TestPlans/UnitTests.xctestplan">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:MatrixSDKTests/TestPlans/AllTestsWithSanitizers.xctestplan">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:MatrixSDKTests/TestPlans/UnitTestsWithSanitizers.xctestplan">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:MatrixSDKTests/TestPlans/CryptoTests.xctestplan">
-         </TestPlanReference>
-         <TestPlanReference
-            reference = "container:MatrixSDKTests/TestPlans/AllWorkingTests.xctestplan">
-         </TestPlanReference>
-      </TestPlans>
-      <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B1E09A0D2397FA950057C069"
-               BuildableName = "MatrixSDKTests.xctest"
-               BlueprintName = "MatrixSDKTests-macOS"
-               ReferencedContainer = "container:MatrixSDK.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-      </Testables>
+      <AdditionalOptions>
+      </AdditionalOptions>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -103,6 +84,8 @@
             ReferencedContainer = "container:MatrixSDK.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
+      <AdditionalOptions>
+      </AdditionalOptions>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

@@ -26,15 +26,14 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The `MXQRCodeTransaction` extension exposes internal operations.
  */
-@interface MXLegacyQRCodeTransaction ()
+@interface MXQRCodeTransaction ()
 
-@property (nonatomic) MXQRCodeTransactionState state;
 @property (nonatomic, nullable) MXQRCodeKeyVerificationStart *startContent;
 @property (nonatomic, strong, nullable) MXQRCodeData *qrCodeData; // Current user QR code, used to show, if support method MXKeyVerificationMethodQRCodeShow
 
 - (nullable instancetype)initWithOtherDevice:(MXDeviceInfo*)otherDevice
                                   qrCodeData:(nullable MXQRCodeData*)qrCodeData
-                                  andManager:(MXLegacyKeyVerificationManager *)manager;
+                                  andManager:(MXKeyVerificationManager *)manager;
 
 - (void)handleStart:(MXQRCodeKeyVerificationStart*)startContent;
 

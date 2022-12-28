@@ -67,7 +67,7 @@
     XCTestExpectation *expectation = [self expectationWithDescription:@"asyncTest"];
 
     __block BOOL certificateCheckAsked = NO;
-    [matrixSDKTestsData getHttpsBobCredentials:self readyToTest:^{
+    [matrixSDKTestsData getHttpsBobCredentials:^{
 
         XCTAssert(certificateCheckAsked, @"We must have been asked to check the certificate");
         XCTAssertNotNil(matrixSDKTestsData.bobCredentials);
@@ -90,13 +90,13 @@
 {
     XCTestExpectation *expectation = [self expectationWithDescription:@"asyncTest"];
 
-    [matrixSDKTestsData getHttpsBobCredentials:self readyToTest:^{
+    [matrixSDKTestsData getHttpsBobCredentials:^{
 
         MXRestClient *mxRestClient = [[MXRestClient alloc] initWithCredentials:matrixSDKTestsData.bobCredentials andOnUnrecognizedCertificateBlock:^BOOL(NSData *certificate) {
 
             XCTFail(@"We have already accepted the certificate. We should not be asked again");
             return NO;
-        } andPersistentTokenDataHandler:nil andUnauthenticatedHandler:nil];
+        }];
 
         [matrixSDKTestsData retain:mxRestClient];
 
@@ -127,7 +127,7 @@
 
             XCTAssertNotNil(room);
 
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
                 [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
                     XCTAssertEqual(direction, MXTimelineDirectionForwards);
@@ -137,7 +137,7 @@
                 }];
             }];
 
-            [room sendTextMessage:@"Hello" threadId:nil success:nil failure:^(NSError *error) {
+            [room sendTextMessage:@"Hello" success:nil failure:^(NSError *error) {
                 XCTFail(@"Cannot set up intial test conditions - error: %@", error);
                 [expectation fulfill];
             }];
@@ -164,7 +164,7 @@
 
             [room enableEncryptionWithAlgorithm:kMXCryptoMegolmAlgorithm success:^{
 
-                [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+                [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                     [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
@@ -176,7 +176,7 @@
                     }];
                 }];
 
-                [room sendTextMessage:@"Hello" threadId:nil success:nil failure:^(NSError *error) {
+                [room sendTextMessage:@"Hello" success:nil failure:^(NSError *error) {
                     XCTFail(@"Cannot set up intial test conditions - error: %@", error);
                     [expectation fulfill];
                 }];
@@ -203,12 +203,12 @@
 
             XCTAssertNotNil(room);
 
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
                     XCTAssertEqual(direction, MXTimelineDirectionForwards);
-                    XCTAssertEqualObjects(event.content[kMXMessageTypeKey], kMXMessageTypeImage);
+                    XCTAssertEqualObjects(event.content[@"msgtype"], kMXMessageTypeImage);
 
                     NSString *contentURL = event.content[@"url"];
                     XCTAssert(contentURL);
@@ -229,7 +229,7 @@
             CGSize size = CGSizeMake(100, 100);
             UIImage *image = [self anImageWithSize:size];
 
-            [room sendImage:UIImagePNGRepresentation(image) withImageSize:size mimeType:@"image/png" andThumbnail:nil threadId:nil localEcho:nil success:nil failure:^(NSError *error) {
+            [room sendImage:UIImagePNGRepresentation(image) withImageSize:size mimeType:@"image/png" andThumbnail:nil localEcho:nil success:nil failure:^(NSError *error) {
                 XCTFail(@"Cannot set up intial test conditions - error: %@", error);
                 [expectation fulfill];
             }];
@@ -273,12 +273,12 @@
 
             XCTAssertNotNil(room);
 
-            [room liveTimeline:^(id<MXEventTimeline> liveTimeline) {
+            [room liveTimeline:^(MXEventTimeline *liveTimeline) {
 
                 [liveTimeline listenToEventsOfTypes:@[kMXEventTypeStringRoomMessage] onEvent:^(MXEvent *event, MXTimelineDirection direction, MXRoomState *roomState) {
 
                     XCTAssertEqual(direction, MXTimelineDirectionForwards);
-                    XCTAssertEqualObjects(event.content[kMXMessageTypeKey], kMXMessageTypeImage);
+                    XCTAssertEqualObjects(event.content[@"msgtype"], kMXMessageTypeImage);
 
                     NSString *contentURL = event.content[@"url"];
                     XCTAssert(contentURL);
@@ -308,7 +308,7 @@
             CGSize size = CGSizeMake(100, 100);
             UIImage *image = [self anImageWithSize:size];
 
-            [room sendImage:UIImagePNGRepresentation(image) withImageSize:size mimeType:@"image/png" andThumbnail:nil threadId:nil localEcho:nil success:nil failure:^(NSError *error) {
+            [room sendImage:UIImagePNGRepresentation(image) withImageSize:size mimeType:@"image/png" andThumbnail:nil localEcho:nil success:nil failure:^(NSError *error) {
                 XCTFail(@"Cannot set up intial test conditions - error: %@", error);
                 [expectation fulfill];
             }];
